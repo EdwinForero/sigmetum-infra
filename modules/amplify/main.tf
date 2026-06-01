@@ -28,8 +28,7 @@ resource "aws_amplify_app" "this" {
   }
 
   tags = {
-    Environment = var.environment
-    ManagedBy   = "terraform"
+    Component = "frontend"
   }
 }
 

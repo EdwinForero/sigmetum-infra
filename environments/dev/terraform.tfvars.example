@@ -2,7 +2,7 @@
 # terraform.tfvars is git-ignored — never commit real secrets.
 
 notification_email = "edwinmenfor2000@gmail.com"
-bucket_name        = "sigmetum-dev"
+bucket_name        = "sigmetum-app-dev"
 github_repository  = "https://github.com/YOUR_ORG/sigmetum-frontend"
 github_access_token = "ghp_YOUR_TOKEN_HERE"
 

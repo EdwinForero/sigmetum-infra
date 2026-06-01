@@ -1,5 +1,9 @@
 resource "aws_elastic_beanstalk_application" "this" {
   name = "sigmetum-backend-${var.environment}"
+
+  tags = {
+    Component = "backend"
+  }
 }
 
 resource "aws_elastic_beanstalk_environment" "this" {
@@ -7,6 +11,10 @@ resource "aws_elastic_beanstalk_environment" "this" {
   application         = aws_elastic_beanstalk_application.this.name
   solution_stack_name = var.solution_stack_name
   tier                = "WebServer"
+
+  tags = {
+    Component = "backend"
+  }
 
   # ── VPC ────────────────────────────────────────────────────────────────────
   setting {

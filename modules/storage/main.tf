@@ -2,8 +2,7 @@ resource "aws_s3_bucket" "app" {
   bucket = var.bucket_name
 
   tags = {
-    Environment = var.environment
-    ManagedBy   = "terraform"
+    Component = "storage"
   }
 }
 
@@ -32,4 +31,26 @@ resource "aws_s3_bucket_public_access_block" "app" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+resource "aws_iam_role_policy" "beanstalk_s3" {
+  name = "sigmetum-s3-access-${var.environment}"
+  role = "aws-elasticbeanstalk-ec2-role"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        aws_s3_bucket.app.arn,
+        "${aws_s3_bucket.app.arn}/*"
+      ]
+    }]
+  })
 }

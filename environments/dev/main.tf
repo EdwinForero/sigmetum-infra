@@ -32,6 +32,6 @@ module "amplify" {
 
   repository          = var.github_repository
   github_access_token = var.github_access_token
-  branch              = "develop"
+  branch              = "feature/testing"
   backend_url         = "http://${module.beanstalk.endpoint_url}"
 }

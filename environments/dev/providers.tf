@@ -9,8 +9,9 @@ terraform {
   }
 }
 
+# Profile is passed via AWS_PROFILE=sigmetum-preprod — see docs/aws-cli-setup.md
 provider "aws" {
-  region = "eu-west-3"
+  region = "eu-west-1"
 
   default_tags {
     tags = {
