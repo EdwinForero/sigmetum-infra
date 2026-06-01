@@ -1,0 +1,25 @@
+# Copy this file to terraform.tfvars and fill in the values.
+# terraform.tfvars is git-ignored — never commit real secrets.
+
+notification_email  = "edwinmenfor2000@gmail.com"
+bucket_name         = "sigmetum-prod"
+github_repository   = "https://github.com/YOUR_ORG/sigmetum-frontend"
+github_access_token = "ghp_YOUR_TOKEN_HERE"
+
+# Find this in AWS Console → Certificate Manager → sigmetum-a.org certificate
+ssl_certificate_arn = "arn:aws:acm:eu-west-3:982534375701:certificate/YOUR_CERT_ID"
+
+app_env_vars = {
+  PORT           = "8000"
+  NODE_ENV       = "production"
+  JWT_SECRET     = "CHANGE_ME_strong_random_value"
+  JWT_EXPIRATION = "10m"
+
+  AWS_REGION          = "eu-west-3"
+  AWS_BUCKET_NAME     = "sigmetum-prod"
+  AWS_ACCESSKEYID     = "REPLACE_WITH_NEW_KEY"
+  AWS_SECRETACCESSKEY = "REPLACE_WITH_NEW_SECRET"
+
+  EMAIL          = "your@email.com"
+  EMAIL_PASSWORD = "your_app_password"
+}
