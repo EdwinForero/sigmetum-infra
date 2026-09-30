@@ -1,0 +1,10 @@
+# Finales de línea coherentes entre Windows, Linux (CI) y macOS.
+# Con esto se acaban los avisos "LF will be replaced by CRLF" y los diffs ruidosos.
+* text=auto eol=lf
+
+# Archivos que nunca se normalizan
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
