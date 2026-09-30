@@ -1,0 +1,24 @@
+# Actualizaciones de dependencias. Dependabot abre PRs y la CI las valida.
+# Las actualizaciones de seguridad se activan aparte en Settings > Code security de GitHub.
+
+version: 2
+updates:
+  - package-ecosystem: terraform
+    directory: /environments/dev
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: terraform
+    directory: /environments/prod
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday

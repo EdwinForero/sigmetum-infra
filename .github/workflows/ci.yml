@@ -1,0 +1,84 @@
+# Integración continua: ejecuta la definición de terminado de docs/guias/buenas-practicas-terraform.md
+# y docs/guias/mantenimiento.md. Los comandos son los mismos que se ejecutan en local; si cambias uno aquí,
+# cámbialo también en CLAUDE.md, las guías y .github/pull_request_template.md
+# (node scripts/docs-check.mjs comprueba que coinciden).
+#
+# Sin credenciales de AWS: no se ejecuta `terraform plan` ni `terraform apply` en CI.
+# Mejora futura: un rol OIDC de solo lectura para publicar el `plan` de preprod como comentario de la PR.
+# El `apply` siempre es manual (ver docs/guias/buenas-practicas-terraform.md#bp-7-flujo-de-cambio).
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, feature/testing]
+  schedule:
+    # Cada lunes: detecta deriva y vulnerabilidades nuevas aunque no haya cambios de código.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Formato, validación, calidad y documentación
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.9.8' # cumple required_version (>= 1.5) de environments/*/providers.tf
+          terraform_wrapper: false
+
+      - name: terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: terraform init y validate (dev)
+        working-directory: environments/dev
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: terraform init y validate (prod)
+        working-directory: environments/prod
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+      # Node 20: el mismo que usa la plataforma de Beanstalk (modules/beanstalk/variables.tf) y Amplify.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Calidad y seguridad
+        run: node scripts/quality-check.mjs
+
+      - name: Documentación al día
+        run: node scripts/docs-check.mjs
+
+  security-scan:
+    name: Escaneo de seguridad de IaC (informativo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Informativo mientras se limpia la línea base de docs/guias/seguridad.md (S3, S5, S9...).
+    # Pasará a bloquear (quitar continue-on-error) cuando esos hallazgos se resuelvan.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: trivy config
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: '1'

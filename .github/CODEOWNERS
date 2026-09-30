@@ -1,0 +1,8 @@
+# Propuesta: revisión obligatoria de quien mantiene los módulos con más impacto (IAM, almacenamiento, red).
+# Para que surta efecto, además de este archivo, la rama principal debe exigir "Require review from Code Owners"
+# (ver docs/guias/mantenimiento.md, sección "Ajustes de GitHub que no están en el código").
+# Sustituye @equipo-infra por el usuario o equipo real antes de activarlo.
+
+/modules/storage/   @equipo-infra
+/modules/beanstalk/ @equipo-infra
+/modules/networking/ @equipo-infra
