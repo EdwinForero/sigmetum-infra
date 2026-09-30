@@ -1,24 +1,29 @@
 # Copy this file to terraform.tfvars and fill in the values.
 # terraform.tfvars is git-ignored — never commit real secrets.
+# Keys of app_env_vars: see docs/referencia-modulos.md
 
 notification_email  = "edwinmenfor2000@gmail.com"
-bucket_name         = "sigmetum-prod"
+bucket_name         = "sigmetum-app-prod"
 github_repository   = "https://github.com/YOUR_ORG/sigmetum-frontend"
 github_access_token = "ghp_YOUR_TOKEN_HERE"
 
-# Find this in AWS Console → Certificate Manager → sigmetum-a.org certificate
-ssl_certificate_arn = "arn:aws:acm:eu-west-3:982534375701:certificate/YOUR_CERT_ID"
+# Find this in AWS Console → Certificate Manager → sigmetum-a.org certificate (same region as the provider)
+ssl_certificate_arn = "arn:aws:acm:eu-west-1:YOUR_ACCOUNT_ID:certificate/YOUR_CERT_ID"
 
 app_env_vars = {
-  PORT           = "8000"
-  NODE_ENV       = "production"
+  PORT            = "8000"
+  AWS_REGION      = "eu-west-1"
+  AWS_BUCKET_NAME = "sigmetum-app-prod"
+
   JWT_SECRET     = "CHANGE_ME_strong_random_value"
   JWT_EXPIRATION = "10m"
 
-  AWS_REGION          = "eu-west-3"
-  AWS_BUCKET_NAME     = "sigmetum-prod"
-  AWS_ACCESSKEYID     = "REPLACE_WITH_NEW_KEY"
-  AWS_SECRETACCESSKEY = "REPLACE_WITH_NEW_SECRET"
+  # Bcrypt hash of the admin password (never the plain text)
+  ADMIN_USERNAME = "CHANGE_ME_admin_user"
+  ADMIN_PASSWORD = "CHANGE_ME_bcrypt_hash"
+
+  # Exact origin of the frontend of this environment (no trailing slash)
+  ALLOWED_ORIGIN = "https://CHANGE_ME_frontend_origin"
 
   EMAIL          = "your@email.com"
   EMAIL_PASSWORD = "your_app_password"

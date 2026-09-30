@@ -22,7 +22,7 @@ modules/
 | Beanstalk app | `sigmetum-backend-dev` | `sigmetum-backend-prod` |
 | Beanstalk env | `sigmetum-backend-dev-env` | `sigmetum-backend-prod-env` |
 | S3 bucket | `sigmetum-app-dev` | `sigmetum-app-prod` |
-| Amplify app | `sigmetum-frontend` | `sigmetum-frontend` |
+| Amplify app | `sigmetum-frontend-dev` | `sigmetum-frontend-prod` |
 | Amplify branch | `feature/testing` | `master` |
 | Instance type | t3.nano | t3.nano (1–3) |
 | Load balancer | None (single instance) | ALB |
@@ -43,11 +43,11 @@ modules/
 
 Both are created per account (preprod and prod). Full commands in [docs/aws-organizations-setup.md](docs/aws-organizations-setup.md).
 
-### 3. GitHub Personal Access Token
+### 2. GitHub Personal Access Token
 
 Generate a token at GitHub → Settings → Developer settings → Personal access tokens (classic) with scope `repo`. Keep it for the tfvars below.
 
-### 4. (Prod only) ACM certificate
+### 3. (Prod only) ACM certificate
 
 Request a certificate for `*.sigmetum-a.org` or `backend.sigmetum-a.org` in ACM (eu-west-1). Copy the ARN for the prod tfvars.
 
@@ -67,24 +67,7 @@ cd environments/dev
 set AWS_PROFILE=sigmetum-preprod
 ```
 
-Create `terraform.tfvars` (never commit this file):
-
-```hcl
-notification_email  = "your@email.com"
-bucket_name         = "sigmetum-app-dev"
-github_repository   = "https://github.com/EdwinForero/sigmetum-frontend"
-github_access_token = "ghp_..."
-
-app_env_vars = {
-  PORT            = "8000"
-  AWS_REGION      = "eu-west-1"
-  AWS_BUCKET_NAME = "sigmetum-app-dev"
-  JWT_SECRET      = "<random 64-char hex>"
-  JWT_EXPIRATION  = "30d"
-  EMAIL           = "your-gmail@gmail.com"
-  EMAIL_PASSWORD  = "your-gmail-app-password"
-}
-```
+Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev).
 
 ```powershell
 terraform init
@@ -106,25 +89,7 @@ cd environments/prod
 set AWS_PROFILE=sigmetum-prod
 ```
 
-Create `terraform.tfvars`:
-
-```hcl
-notification_email  = "your@email.com"
-bucket_name         = "sigmetum-app-prod"
-github_repository   = "https://github.com/EdwinForero/sigmetum-frontend"
-github_access_token = "ghp_..."
-ssl_certificate_arn = "arn:aws:acm:eu-west-1:..."
-
-app_env_vars = {
-  PORT            = "8000"
-  AWS_REGION      = "eu-west-1"
-  AWS_BUCKET_NAME = "sigmetum-app-prod"
-  JWT_SECRET      = "<different random secret from dev>"
-  JWT_EXPIRATION  = "30d"
-  EMAIL           = "your-gmail@gmail.com"
-  EMAIL_PASSWORD  = "your-gmail-app-password"
-}
-```
+Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod).
 
 ```powershell
 terraform init
@@ -165,11 +130,27 @@ All resources are tagged with `Project`, `Environment`, `ManagedBy`, and `Compon
 
 ## Outputs
 
-After `terraform apply` both environments expose:
+Each environment exposes its own outputs; they are listed in [docs/referencia-modulos.md](docs/referencia-modulos.md).
 
-| Output | Description |
+## Documentation
+
+| Document | Content |
 |---|---|
-| `beanstalk_endpoint` | EB environment URL |
-| `amplify_default_domain` | Amplify default domain |
-| `amplify_branch_url` | Direct branch URL |
-| `s3_bucket_name` | App S3 bucket name |
+| [docs/guias/mantenimiento.md](docs/guias/mantenimiento.md) | Rules to keep the documentation up to date and definition of done (read it after every change) |
+| [docs/guias/buenas-practicas-terraform.md](docs/guias/buenas-practicas-terraform.md) | Terraform rules: structure, variables, versions, state, tags, change flow (read it before touching any `.tf`) |
+| [docs/guias/seguridad.md](docs/guias/seguridad.md) | Infrastructure security rules and current status (read it before touching IAM, S3, secrets, network, TLS or Amplify) |
+| [docs/referencia-modulos.md](docs/referencia-modulos.md) | Variables and outputs of each module and environment, and the `app_env_vars` keys |
+| [scripts/quality-check.mjs](scripts/quality-check.mjs) | Quality and security gate: `node scripts/quality-check.mjs` (run it together with `node scripts/docs-check.mjs`) |
+| [docs/estado-y-deuda-tecnica.md](docs/estado-y-deuda-tecnica.md) | Metrics, open findings and technical debt |
+| [docs/terraform-setup.md](docs/terraform-setup.md) | Install Terraform and first use |
+| [docs/aws-cli-setup.md](docs/aws-cli-setup.md) | AWS CLI and SSO profiles |
+| [docs/aws-organizations-setup.md](docs/aws-organizations-setup.md) | Multi-account setup and state buckets |
+| [docs/iam-role-setup.md](docs/iam-role-setup.md) | Terraform deploy role |
+| [docs/billing-tags.md](docs/billing-tags.md) | Cost tags |
+| [docs/integracion/para-frontend.md](docs/integracion/para-frontend.md) | What this infrastructure provides to and needs from the frontend (Amplify, `VITE_*`, domains, static assets) |
+| [docs/integracion/para-backend.md](docs/integracion/para-backend.md) | What it provides to and needs from the backend (`app_env_vars`, health check, ALB, S3 IAM) |
+| [INTEGRACION.md](INTEGRACION.md) | Entry point to the integration documents of the three repositories |
+
+## CI and GitHub
+
+`.github/workflows/ci.yml` runs `terraform fmt -check -recursive`, `terraform validate` for each environment, `node scripts/quality-check.mjs` and `node scripts/docs-check.mjs` on every pull request (no AWS credentials, no `plan`, no `apply`). Branch protection and Dependabot security updates are GitHub settings described in [docs/guias/mantenimiento.md](docs/guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios).
