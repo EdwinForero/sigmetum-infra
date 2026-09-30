@@ -77,7 +77,7 @@ const environments = subdirs('environments');
 const tfFiles = walk('.').filter((file) => file.endsWith('.tf'));
 
 // ── Documentos ─────────────────────────────────────────────────────────────────────────────────
-const docFiles = ['README.md', 'INTEGRACION.md', 'CLAUDE.md', ...walk('docs').filter((file) => file.endsWith('.md'))].filter(
+const docFiles = ['README.md', 'CLAUDE.md', ...walk('docs').filter((file) => file.endsWith('.md'))].filter(
   (file) => existsSync(join(ROOT, file))
 );
 const docs = Object.fromEntries(docFiles.map((file) => [file, read(file)]));
@@ -216,15 +216,14 @@ check(
     .filter(Boolean)
 );
 
-// 2c. Cada documento de integración figura en el índice del README, en CLAUDE.md y en INTEGRACION.md
+// 2c. Cada documento de integración figura en el índice del README y en CLAUDE.md
 check(
-  'Documentos de integración (docs/integracion → README.md, CLAUDE.md e INTEGRACION.md)',
+  'Documentos de integración (docs/integracion → README.md y CLAUDE.md)',
   docFiles
     .filter((file) => file.startsWith('docs/integracion/'))
     .flatMap((file) => [
       !docs['README.md'].includes(`(${file}`) && `${file} no figura en el índice del README`,
       !(docs['CLAUDE.md'] ?? '').includes(file) && `${file} no figura en CLAUDE.md`,
-      !(docs['INTEGRACION.md'] ?? '').includes(file) && `${file} no figura en INTEGRACION.md`,
     ])
     .filter(Boolean)
 );
@@ -509,7 +508,7 @@ warn(
 
 warn(
   'Contrato: documento del frontend',
-  existsSync(join(FRONTEND, 'docs', 'integracion', 'para-infra.md')) ? [] : ['No existe ../sigmetum-frontend/docs/integracion/para-infra.md: INTEGRACION.md apunta a un documento que no se puede leer']
+  existsSync(join(FRONTEND, 'docs', 'integracion', 'para-infra.md')) ? [] : ['No existe ../sigmetum-frontend/docs/integracion/para-infra.md: los enlaces de los documentos de integración a ese documento no se pueden comprobar']
 );
 
 // ── Informe ────────────────────────────────────────────────────────────────────────────────────

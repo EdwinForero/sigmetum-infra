@@ -51,7 +51,10 @@ Cada repositorio tiene `docs/integracion/` con **un documento por cada uno de lo
 | `sigmetum-backend` | `para-frontend.md`, `para-infra.md` |
 | `sigmetum-infra` | [para-frontend.md](../integracion/para-frontend.md), [para-backend.md](../integracion/para-backend.md) |
 
-Un `para-X.md` **está escrito para quien mantiene X**: qué necesita y qué espera este repositorio de X, qué ofrece, el estado de las discrepancias y qué avisar si algo cambia. Además, [INTEGRACION.md](../../INTEGRACION.md) en la raíz apunta a esos documentos y a los de los hermanos.
+Un `para-X.md` **está escrito para quien mantiene X**: qué necesita y qué espera este repositorio de X, qué ofrece, el estado de las discrepancias y qué avisar si algo cambia. **Documentos de los repositorios hermanos** (este repositorio los contrasta, no los copia):
+
+- **Frontend:** `../sigmetum-frontend/docs/integracion/para-infra.md` en local, y en GitHub https://github.com/EdwinForero/sigmetum-frontend/blob/master/docs/integracion/para-infra.md (el enlace solo funciona cuando la rama `feature/sigmetum_front_v2` se fusione en `master`; **por confirmar**).
+- **Backend:** no tiene `docs/integracion/` propio; su contrato con esta infraestructura es `../sigmetum-backend/config/validateEnv.js`, `index.js` y `aws/awsS3connect.js`, citados en [para-backend.md](../integracion/para-backend.md).
 
 ### 3.2 Quién es dueño de cada hecho
 

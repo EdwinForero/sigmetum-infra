@@ -36,7 +36,7 @@ Si lo que te piden **contradice una guía, avisa y pregunta antes de hacerlo**. 
 | Amplify, `build_spec`, variables `VITE_*`, dominios, recursos estáticos | `docs/integracion/para-frontend.md` |
 | `app_env_vars`, health check, ALB, DNS del backend, IAM de S3, plataforma de Beanstalk | `docs/integracion/para-backend.md` |
 
-En el resumen final di **qué deben hacer los otros repositorios y en qué orden desplegar**; en la PR, rellena la sección "Frontend y backend" de `.github/pull_request_template.md`. Los ids de otros repositorios se escriben con su nombre (`frontend:I1`, `backend:B1`, `infra:C5`). `INTEGRACION.md` es la entrada a estos documentos.
+En el resumen final di **qué deben hacer los otros repositorios y en qué orden desplegar**; en la PR, rellena la sección "Frontend y backend" de `.github/pull_request_template.md`. Los ids de otros repositorios se escriben con su nombre (`frontend:I1`, `backend:B1`, `infra:C5`). Los documentos de los repositorios hermanos están localizados en la sección 3.1 de `docs/guias/mantenimiento.md`.
 
 ## CI y plantilla de PR
 

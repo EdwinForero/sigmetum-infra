@@ -149,7 +149,6 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [docs/billing-tags.md](docs/billing-tags.md) | Cost tags |
 | [docs/integracion/para-frontend.md](docs/integracion/para-frontend.md) | What this infrastructure provides to and needs from the frontend (Amplify, `VITE_*`, domains, static assets) |
 | [docs/integracion/para-backend.md](docs/integracion/para-backend.md) | What it provides to and needs from the backend (`app_env_vars`, health check, ALB, S3 IAM) |
-| [INTEGRACION.md](INTEGRACION.md) | Entry point to the integration documents of the three repositories |
 
 ## CI and GitHub
 
