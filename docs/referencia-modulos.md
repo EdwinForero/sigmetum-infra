@@ -148,7 +148,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | Output | Descripción |
 |---|---|
 | `role_arn` | ARN del rol IAM para GitHub Actions. Configurar como `AWS_ROLE_{ENV}` en GitHub Actions variables |
-| `bucket_name` | Nombre del bucket de artefactos. Configurar como `S3_BUCKET_{ENV}` en GitHub Actions variables |
 
 ## Entorno dev
 
@@ -175,7 +174,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | `s3_bucket` | Nombre del bucket |
 | `cdn_url` | URL HTTPS de CloudFront para los assets del frontend |
 | `ci_role_arn` | ARN del rol IAM para GitHub Actions CI (de `module.backend_ci_iam`) |
-| `ci_bucket_name` | Nombre del bucket de artefactos de deploy (de `module.backend_ci_iam`) |
 
 ## Entorno prod
 
@@ -201,7 +199,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | `amplify_url` | URL de la rama de Amplify |
 | `s3_bucket` | Nombre del bucket |
 | `ci_role_arn` | ARN del rol IAM para GitHub Actions CI (de `module.backend_ci_iam`) |
-| `ci_bucket_name` | Nombre del bucket de artefactos de deploy (de `module.backend_ci_iam`) |
 
 ## app_env_vars
 

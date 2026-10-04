@@ -103,8 +103,8 @@ Push a `feature/testing` → despliega en `sigmetum-backend-dev-env`. Push a `ma
 |----------|-----------------------------|
 | `AWS_ROLE_DEV` | output `ci_role_arn` del entorno dev |
 | `AWS_ROLE_PROD` | output `ci_role_arn` del entorno prod |
-| `S3_BUCKET_DEV` | `sigmetum-backend-deploys-dev` |
-| `S3_BUCKET_PROD` | `sigmetum-backend-deploys-prod` |
+
+El bucket de staging lo deriva el workflow del account ID al correr (`elasticbeanstalk-eu-west-3-{account_id}`) — no hace falta configurarlo.
 
 **Puesta en marcha (paso a paso):**
 
@@ -122,9 +122,8 @@ Push a `feature/testing` → despliega en `sigmetum-backend-dev-env`. Push a `ma
    | Variable | Valor |
    |----------|-------|
    | `AWS_ROLE_DEV` | ARN del output `ci_role_arn` (cuenta dev) |
-   | `S3_BUCKET_DEV` | `sigmetum-backend-deploys-dev` |
 
-4. Repetir los pasos 1–3 para prod (`sigmetum-prod`, entorno `environments/prod/`, variables `AWS_ROLE_PROD` y `S3_BUCKET_PROD`).
+4. Repetir los pasos 1–3 para prod (`sigmetum-prod`, entorno `environments/prod/`, variable `AWS_ROLE_PROD`).
 
 5. Push a `feature/testing` → verificar en GitHub Actions que el job `deploy` pasa.
    - El job `deploy` **no corre en PRs**, solo en push directo a la rama.

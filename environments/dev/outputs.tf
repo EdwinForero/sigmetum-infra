@@ -23,7 +23,3 @@ output "ci_role_arn" {
   value       = module.backend_ci_iam.role_arn
 }
 
-output "ci_bucket_name" {
-  description = "S3 bucket for deployment artifacts."
-  value       = module.backend_ci_iam.bucket_name
-}
