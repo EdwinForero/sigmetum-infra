@@ -34,3 +34,9 @@ variable "s3_url" {
   type        = string
   default     = ""
 }
+
+variable "carousel_image_keys" {
+  description = "Comma-separated S3 keys for the home carousel injected as VITE_CAROUSEL_IMAGE_KEYS; empty until S3 public access (C2) is resolved"
+  type        = string
+  default     = ""
+}

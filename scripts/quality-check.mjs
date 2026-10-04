@@ -67,7 +67,10 @@ const KNOWN_DEBT = {
 };
 
 // Variables cuyo nombre parece un secreto pero no lo es.
-const NOT_SECRET = { ssh_key_name: 'nombre del par de claves de EC2, no su contenido' };
+const NOT_SECRET = {
+  ssh_key_name: 'nombre del par de claves de EC2, no su contenido',
+  carousel_image_keys: 'claves de ruta S3 públicas para el carrusel, no credenciales',
+};
 
 // Recursos que admiten etiquetas y deben llevar Component (Project, Environment y ManagedBy llegan por default_tags).
 const TAGGABLE = ['aws_amplify_app', 'aws_amplify_branch', 'aws_elastic_beanstalk_application', 'aws_elastic_beanstalk_environment', 'aws_s3_bucket'];
@@ -135,8 +138,8 @@ const outputs = tfFiles
       const init = run('terraform', ['init', '-backend=false', '-input=false', '-no-color'], dir);
       if (init.status !== 0) {
         const out = `${init.stdout}\n${init.stderr}`;
-        if (/Failed to query available provider|Failed to install provider|dial tcp|no such host|i\/o timeout|registry\.terraform\.io/i.test(out)) {
-          notes.push(`environments/${env}: terraform init no pudo descargar el proveedor (¿sin red?). Ejecuta la validación con conexión antes de fusionar.`);
+        if (/Failed to query available provider|Failed to install provider|dial tcp|no such host|i\/o timeout|registry\.terraform\.io|No valid credential sources found/i.test(out)) {
+          notes.push(`environments/${env}: terraform init no pudo descargar el proveedor (¿sin red o sin credenciales AWS?). Ejecuta la validación con conexión antes de fusionar.`);
         } else {
           problems.push(`environments/${env}: terraform init falla: ${out.split('\n').find((line) => /Error/.test(line))?.trim() ?? 'ver salida de terraform init'}`);
         }

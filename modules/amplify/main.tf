@@ -23,10 +23,11 @@ resource "aws_amplify_app" "this" {
   EOT
 
   environment_variables = {
-    VITE_BASE_URL   = var.backend_url
-    VITE_API_PREFIX = "/api/v1"
-    VITE_S3_URL     = var.s3_url
-    NODE_ENV        = var.environment
+    VITE_BASE_URL            = var.backend_url
+    VITE_API_PREFIX          = "/api/v1"
+    VITE_S3_URL              = var.s3_url
+    VITE_CAROUSEL_IMAGE_KEYS = var.carousel_image_keys
+    NODE_ENV                 = var.environment
   }
 
   custom_rule {
@@ -50,8 +51,9 @@ resource "aws_amplify_branch" "this" {
   enable_auto_build = true
 
   environment_variables = {
-    VITE_BASE_URL   = var.backend_url
-    VITE_API_PREFIX = "/api/v1"
-    VITE_S3_URL     = var.s3_url
+    VITE_BASE_URL            = var.backend_url
+    VITE_API_PREFIX          = "/api/v1"
+    VITE_S3_URL              = var.s3_url
+    VITE_CAROUSEL_IMAGE_KEYS = var.carousel_image_keys
   }
 }
