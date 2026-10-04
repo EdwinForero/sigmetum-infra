@@ -81,11 +81,11 @@ Cada cuenta tiene su propio bucket — el estado de prod nunca sale de la cuenta
 
 **preprod:**
 ```
-aws s3api create-bucket --bucket sigmetum-state-dev --region eu-west-3 --create-bucket-configuration LocationConstraint=eu-west-3 --profile sigmetum-preprod
+aws s3api create-bucket --bucket sigmetum-tfstate-dev --region eu-west-3 --create-bucket-configuration LocationConstraint=eu-west-3 --profile sigmetum-preprod
 
-aws s3api put-bucket-versioning --bucket sigmetum-state-dev --versioning-configuration Status=Enabled --profile sigmetum-preprod
+aws s3api put-bucket-versioning --bucket sigmetum-tfstate-dev --versioning-configuration Status=Enabled --profile sigmetum-preprod
 
-aws s3api put-bucket-tagging --bucket sigmetum-state-dev --tagging "TagSet=[{Key=Project,Value=sigmetum},{Key=Environment,Value=preprod},{Key=Component,Value=infrastructure},{Key=ManagedBy,Value=manual}]" --profile sigmetum-preprod
+aws s3api put-bucket-tagging --bucket sigmetum-tfstate-dev --tagging "TagSet=[{Key=Project,Value=sigmetum},{Key=Environment,Value=preprod},{Key=Component,Value=infrastructure},{Key=ManagedBy,Value=manual}]" --profile sigmetum-preprod
 ```
 
 **prod:**
@@ -99,7 +99,7 @@ aws s3api put-bucket-tagging --bucket sigmetum-tfstate-prod --tagging "TagSet=[{
 
 Resultado:
 ```
-sigmetum-preprod  →  sigmetum-state-dev/terraform.tfstate
+sigmetum-preprod  →  sigmetum-tfstate-dev/terraform.tfstate
 sigmetum-prod     →  sigmetum-tfstate-prod/terraform.tfstate
 ```
 
