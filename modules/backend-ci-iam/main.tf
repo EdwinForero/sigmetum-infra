@@ -65,6 +65,7 @@ data "aws_iam_policy_document" "backend_ci" {
       "s3:GetBucketLocation",
       "s3:GetObjectAcl",
       "s3:PutObjectAcl",
+      "s3:DeleteObject",
     ]
     resources = [
       "arn:aws:s3:::${local.eb_bucket}",
@@ -136,6 +137,7 @@ data "aws_iam_policy_document" "backend_ci" {
     effect = "Allow"
     actions = [
       "autoscaling:DescribeAutoScalingGroups",
+      "ec2:DescribeSubnets",
       "elasticbeanstalk:DescribeEnvironments",
       "elasticbeanstalk:DescribeEvents",
     ]
