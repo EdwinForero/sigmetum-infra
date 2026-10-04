@@ -28,7 +28,7 @@ modules/
 | Load balancer | None (single instance) | ALB |
 | HTTPS | No | Yes (ACM) |
 | DNS | — | `backend.sigmetum-a.org` |
-| Region | eu-west-1 | eu-west-1 |
+| Region | eu-west-3 | eu-west-3 |
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ Generate a token at GitHub → Settings → Developer settings → Personal acce
 
 ### 3. (Prod only) ACM certificate
 
-Request a certificate for `*.sigmetum-a.org` or `backend.sigmetum-a.org` in ACM (eu-west-1). Copy the ARN for the prod tfvars.
+Request a certificate for `*.sigmetum-a.org` or `backend.sigmetum-a.org` in ACM (eu-west-3). Copy the ARN for the prod tfvars.
 
 ## First-time deploy
 

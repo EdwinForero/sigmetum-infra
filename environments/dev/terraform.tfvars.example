@@ -21,7 +21,7 @@ app_env_vars = {
   PORT = "8000"
 
   # Región AWS donde está el bucket. Debe coincidir con la del proveedor Terraform.
-  AWS_REGION = "eu-west-1"
+  AWS_REGION = "eu-west-3"
 
   # Nombre del bucket S3 — debe coincidir con bucket_name de arriba.
   AWS_BUCKET_NAME = "sigmetum-app-dev"

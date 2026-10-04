@@ -19,14 +19,14 @@ github_access_token = "ghp_CHANGE_ME"
 # ARN del certificado ACM para el listener HTTPS del ALB.
 # Solicítalo en: AWS Console → Certificate Manager → eu-west-1 → Request certificate
 # Dominio: *.sigmetum-a.org (o backend.sigmetum-a.org). El ARN aparece tras la validación DNS.
-ssl_certificate_arn = "arn:aws:acm:eu-west-1:ACCOUNT_ID:certificate/CERT_ID"
+ssl_certificate_arn = "arn:aws:acm:eu-west-3:ACCOUNT_ID:certificate/CERT_ID"
 
 app_env_vars = {
   # Puerto interno del proceso Node.js. Beanstalk redirige el 80 aquí vía nginx.
   PORT = "8000"
 
   # Región AWS donde está el bucket. Debe coincidir con la del proveedor Terraform.
-  AWS_REGION = "eu-west-1"
+  AWS_REGION = "eu-west-3"
 
   # Nombre del bucket S3 — debe coincidir con bucket_name de arriba.
   AWS_BUCKET_NAME = "sigmetum-app-prod"
