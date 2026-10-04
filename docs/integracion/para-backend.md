@@ -21,16 +21,16 @@ El backend exige estas variables al arrancar (`config/validateEnv.js`, verificad
 |---|---|---|---|
 | `JWT_SECRET` | Sí | Sí | Sí |
 | `JWT_EXPIRATION` | Sí | Sí | No |
-| `ADMIN_USERNAME` | Sí | **No** (infra:C5) | No |
-| `ADMIN_PASSWORD` | Sí | **No** (infra:C5) | Sí (hash bcrypt) |
+| `ADMIN_USERNAME` | Sí | Sí | No |
+| `ADMIN_PASSWORD` | Sí | Sí | Sí (hash bcrypt) |
 | `EMAIL` | Sí | Sí | No |
 | `EMAIL_PASSWORD` | Sí | Sí | Sí |
-| `AWS_REGION` | Sí | Sí | No |
-| `AWS_BUCKET_NAME` | Sí | Sí | No |
-| `ALLOWED_ORIGIN` | Sí | **No** (infra:C5) | No |
+| `AWS_REGION` | Sí | Sí (`eu-west-3`) | No |
+| `AWS_BUCKET_NAME` | Sí | Sí (`sigmetum-app-assets-dev` / `sigmetum-app-assets-prod`) | No |
+| `ALLOWED_ORIGIN` | Sí | Sí (vacío en dev hasta conocer la URL de Amplify) | No |
 | `AWS_PROFILE` | Solo si `NODE_ENV=local` | No aplica (Beanstalk no usa `NODE_ENV=local`) | No |
 
-Las plantillas `environments/*/terraform.tfvars.example` de este repositorio ya incluyen las tres claves que faltaban; falta aplicarlas a los `terraform.tfvars` reales (fuera de este repositorio, no se han leído).
+Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las claves obligatorias. Los `terraform.tfvars` reales (fuera de git) deben tenerlas aplicadas por quien despliega.
 
 **Cómo llegan hoy:** como propiedades de entorno del entorno de Beanstalk (`dynamic "setting"` sobre `app_env_vars`, namespace `aws:elasticbeanstalk:application:environment`, verificado en `modules/beanstalk/main.tf`). Son legibles en la consola por quien pueda ver la configuración del entorno (hallazgo de seguridad [S6](../estado-y-deuda-tecnica.md#abiertos)).
 
@@ -85,7 +85,7 @@ Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN`
 |---|---|---|---|---|
 | **B1** | Sin `trust proxy`, el límite de intentos de login puede agruparse por la IP del balanceador | `../sigmetum-backend/index.js` | backend | Confirmar el efecto real tras el ALB y, si aplica, añadir `app.set('trust proxy', 1)` |
 | **B2** | La política IAM de S3 da escritura y borrado sobre todo el bucket, más permiso del que usa el código | `modules/storage/main.tf` | infra | Limitar a los prefijos de `config/s3Paths.js` (también registrado como [S7](../estado-y-deuda-tecnica.md#abiertos)) |
-| **B3** | `package.json` del backend no fija `engines.node`; si alguien lo ejecuta con otra versión de Node, nada lo avisa | `../sigmetum-backend/package.json` | backend | Añadir `"engines": { "node": "20.x" }` |
+| **B3** | ~~`package.json` del backend no fija `engines.node`~~  | `../sigmetum-backend/package.json` | backend | **Resuelto (03/10/2026):** `"engines": { "node": "22.x" }` añadido |
 
 ## 9. Si cambias algo (en `sigmetum-infra`)
 
