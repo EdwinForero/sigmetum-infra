@@ -1,7 +1,10 @@
+data "aws_caller_identity" "current" {}
+
 locals {
+  account_id  = data.aws_caller_identity.current.account_id
   bucket_name = "sigmetum-backend-deploys-${var.environment}"
-  eb_app_arn  = "arn:aws:elasticbeanstalk:${var.aws_region}:${var.account_id}:application/sigmetum-backend-${var.environment}"
-  eb_env_arn  = "arn:aws:elasticbeanstalk:${var.aws_region}:${var.account_id}:environment/sigmetum-backend-${var.environment}/sigmetum-backend-${var.environment}-env"
+  eb_app_arn  = "arn:aws:elasticbeanstalk:${var.aws_region}:${local.account_id}:application/sigmetum-backend-${var.environment}"
+  eb_env_arn  = "arn:aws:elasticbeanstalk:${var.aws_region}:${local.account_id}:environment/sigmetum-backend-${var.environment}/sigmetum-backend-${var.environment}-env"
   # "any principal" constant used by the DenyNonTLS statement — avoids a literal "*" in policy strings
   any_principal = "*"
 }
@@ -135,7 +138,7 @@ data "aws_iam_policy_document" "deploys_bucket" {
     condition {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
-      values   = [var.account_id]
+      values   = [local.account_id]
     }
   }
 

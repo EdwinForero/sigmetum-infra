@@ -16,7 +16,7 @@ Se actualizan con `node scripts/docs-check.mjs --metrics`. El script falla si es
 | Módulos | 6 |
 | Entornos | 2 |
 | Archivos .tf | 28 |
-| Variables de módulos | 32 |
+| Variables de módulos | 31 |
 | Outputs de módulos | 17 |
 | Recursos declarados | 21 |
 | Claves de app_env_vars | 10 |

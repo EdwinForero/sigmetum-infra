@@ -31,7 +31,6 @@ module "backend_ci_iam" {
   source = "../../modules/backend-ci-iam"
 
   environment   = "dev"
-  account_id    = var.account_id
   github_repo   = "edwinmenfor2000/sigmetum-backend"
   github_branch = "feature/testing"
   aws_region    = "eu-west-3"

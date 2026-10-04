@@ -139,7 +139,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | Variable | Tipo | Por defecto | Descripción |
 |---|---|---|---|
 | `environment` | string | — | Entorno de despliegue: dev o prod |
-| `account_id` | string | — | ID de la cuenta AWS de este entorno |
 | `github_repo` | string | — | Repositorio GitHub en formato `owner/name` |
 | `github_branch` | string | — | Rama que puede asumir el rol CI |
 | `aws_region` | string | — | Región AWS donde viven los recursos de Beanstalk |
@@ -159,7 +158,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 | Variable | Tipo | Por defecto | Descripción |
 |---|---|---|---|
-| `account_id` | string | — | ID de la cuenta AWS de este entorno |
 | `notification_email` | string | — | Correo de notificaciones de Beanstalk |
 | `bucket_name` | string | — | Nombre del bucket S3 |
 | `ssl_certificate_arn` | string | `""` | Declarada pero sin uso en `dev` |
@@ -187,7 +185,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 | Variable | Tipo | Por defecto | Descripción |
 |---|---|---|---|
-| `account_id` | string | — | ID de la cuenta AWS de este entorno |
 | `notification_email` | string | — | Correo de notificaciones de Beanstalk |
 | `bucket_name` | string | — | Nombre del bucket S3 |
 | `ssl_certificate_arn` | string | — | Certificado ACM, en la misma región que el proveedor |

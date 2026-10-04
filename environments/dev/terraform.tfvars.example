@@ -2,9 +2,6 @@
 # terraform.tfvars está en .gitignore — nunca lo versiones.
 # Referencia completa de claves: docs/referencia-modulos.md
 
-# ID de la cuenta AWS de este entorno. Visible en: AWS Console → esquina superior derecha.
-account_id = "CHANGE_ME_aws_account_id"
-
 # Correo que recibe las notificaciones SNS de Beanstalk (health, deploy).
 notification_email = "tu@email.com"
 
