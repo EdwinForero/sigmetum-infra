@@ -99,6 +99,21 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
+  # Beanstalk delegates CloudFormation reads to the caller role on UpdateEnvironment
+  statement {
+    sid    = "EBCloudFormationRead"
+    effect = "Allow"
+    actions = [
+      "cloudformation:GetTemplate",
+      "cloudformation:DescribeStackResource",
+      "cloudformation:DescribeStackResources",
+      "cloudformation:DescribeStacks",
+    ]
+    resources = [
+      "arn:aws:cloudformation:${var.aws_region}:${local.account_id}:stack/awseb-*",
+    ]
+  }
+
   # DescribeEnvironments and DescribeEvents do not support resource-level restrictions
   statement {
     sid    = "BeanstalkDescribe"
