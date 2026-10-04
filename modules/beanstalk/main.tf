@@ -282,7 +282,7 @@ resource "aws_elastic_beanstalk_environment" "this" {
 
   # ── App environment variables ──────────────────────────────────────────────
   dynamic "setting" {
-    for_each = var.app_env_vars
+    for_each = nonsensitive(var.app_env_vars)
     content {
       namespace = "aws:elasticbeanstalk:application:environment"
       name      = setting.key
