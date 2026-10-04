@@ -153,28 +153,46 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
-  # AutoScaling Describe* and DescribeEnvironments/Events do not support resource-level restrictions
+  # iam:PassRole — EB needs this to pass the EC2 instance profile role
+  statement {
+    sid     = "EBPassRole"
+    effect  = "Allow"
+    actions = ["iam:PassRole"]
+    resources = [
+      "arn:aws:iam::${local.account_id}:role/aws-elasticbeanstalk-ec2-role",
+      "arn:aws:iam::${local.account_id}:role/aws-elasticbeanstalk-service-role",
+    ]
+  }
+
+  # Actions that do not support resource-level restrictions
   statement {
     sid    = "EBAndASGDescribe"
     effect = "Allow"
     actions = [
       "autoscaling:DescribeAutoScalingGroups",
-      "autoscaling:DescribeScalingActivities",
       "autoscaling:DescribeLaunchConfigurations",
+      "autoscaling:DescribeScalingActivities",
+      "autoscaling:SuspendProcesses",
+      "autoscaling:ResumeProcesses",
+      "cloudformation:CancelUpdateStack",
+      "cloudformation:DescribeStackEvents",
+      "cloudformation:ListStackResources",
       "ec2:DescribeAccountAttributes",
       "ec2:DescribeImages",
-      "ec2:DescribeLaunchTemplates",
       "ec2:DescribeInstances",
       "ec2:DescribeInstanceAttribute",
       "ec2:DescribeKeyPairs",
+      "ec2:DescribeLaunchTemplates",
       "ec2:DescribeSecurityGroups",
       "ec2:DescribeSubnets",
       "ec2:DescribeVpcs",
+      "elasticbeanstalk:DescribeApplicationVersions",
       "elasticbeanstalk:DescribeConfigurationOptions",
       "elasticbeanstalk:DescribeConfigurationSettings",
       "elasticbeanstalk:DescribeEnvironments",
       "elasticbeanstalk:DescribeEnvironmentResources",
       "elasticbeanstalk:DescribeEvents",
+      "sns:Subscribe",
     ]
     resources = ["*"]
   }
