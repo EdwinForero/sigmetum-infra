@@ -137,6 +137,7 @@ data "aws_iam_policy_document" "backend_ci" {
     effect = "Allow"
     actions = [
       "autoscaling:DescribeAutoScalingGroups",
+      "ec2:DescribeImages",
       "ec2:DescribeSubnets",
       "elasticbeanstalk:DescribeEnvironments",
       "elasticbeanstalk:DescribeEvents",
