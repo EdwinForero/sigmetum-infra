@@ -8,69 +8,66 @@
 
 ## 1. Objetivo
 
-Que un push al repo del backend despliegue automáticamente el código en el entorno de Beanstalk correspondiente, igual que Amplify hace con el frontend. Terraform se sigue corriendo a mano; este pipeline solo sincroniza el código de la app.
+Que un push al repo del backend despliegue automáticamente el código en el entorno de Beanstalk correspondiente. Terraform se sigue corriendo a mano; este pipeline solo sincroniza el código de la app.
 
-## 2. Reglas de disparo
+## 2. Cuentas AWS
 
-| Rama | Entorno EB |
-|------|-----------|
-| `feature/testing` | `sigmetum-backend-dev-env` (app `sigmetum-backend-dev`) |
-| `master` | `sigmetum-backend-prod-env` (app `sigmetum-backend-prod`) |
+Dev y prod son **cuentas AWS separadas**. Todo recurso creado en `environments/dev/` vive en la cuenta dev; todo lo de `environments/prod/` en la cuenta prod. No hay recursos compartidos entre cuentas.
+
+## 3. Reglas de disparo
+
+| Rama | Entorno EB | Cuenta AWS |
+|------|-----------|------------|
+| `feature/testing` | `sigmetum-backend-dev-env` | dev |
+| `master` | `sigmetum-backend-prod-env` | prod |
 
 El job `deploy` solo corre en eventos `push` (no en `pull_request`) y solo si `verify` pasa.
 
-## 3. Flujo
+## 4. Flujo
 
 ```
 push → verify → [si pasa] deploy
                   1. zip del código (sin node_modules, .env*, .git)
                   2. s3 cp → s3://{bucket}/{sha}.zip
-                  3. elasticbeanstalk create-application-version  (si el label ya existe, se reutiliza)
+                  3. elasticbeanstalk create-application-version  (reutiliza si el label ya existe)
                   4. elasticbeanstalk update-environment
                   5. wait environment-updated
 ```
 
-El label de versión es el SHA de git. Si se hace push del mismo commit dos veces, el paso 3 detecta que el label ya existe y lo reutiliza sin error.
+El label de versión es el SHA de git. Re-push del mismo commit no falla — se reutiliza la versión existente.
 
-## 4. Autenticación con AWS: OIDC
+## 5. Autenticación con AWS: OIDC
 
-Sin claves de larga duración en GitHub secrets. GitHub Actions asume un rol IAM via OIDC.
+Sin claves de larga duración. GitHub Actions asume un rol IAM via OIDC.
 
-### 4a. OIDC provider — recurso de cuenta, se crea una sola vez
+El `aws_iam_openid_connect_provider` es un recurso de cuenta. Como dev y prod son cuentas separadas, se crea una vez en cada una — no hay conflicto. Va dentro de `modules/backend-ci-iam/` junto con el rol y el bucket.
 
-`aws_iam_openid_connect_provider` para `token.actions.githubusercontent.com` es un recurso **de cuenta AWS**, no de entorno. Se crea una única vez en un módulo separado (`modules/github-oidc-provider/`) y se instancia solo en uno de los entornos (o en un entorno `shared/` si se crea). Si ya existe en la cuenta, hay que importarlo antes del apply.
+| Rol | Cuenta | Trust restringido a |
+|-----|--------|-------------------|
+| `sigmetum-backend-ci-dev` | dev | `repo:edwinmenfor2000/sigmetum-backend:ref:refs/heads/feature/testing` |
+| `sigmetum-backend-ci-prod` | prod | `repo:edwinmenfor2000/sigmetum-backend:ref:refs/heads/master` |
 
-### 4b. Roles IAM — uno por entorno
-
-| Rol | Trust restringido a |
-|-----|-------------------|
-| `sigmetum-backend-ci-dev` | `repo:edwinmenfor2000/sigmetum-backend:ref:refs/heads/feature/testing` |
-| `sigmetum-backend-ci-prod` | `repo:edwinmenfor2000/sigmetum-backend:ref:refs/heads/master` |
-
-Permisos mínimos, acotados a recursos exactos:
+Permisos del rol, acotados a recursos exactos:
 
 ```
-s3:PutObject     → arn:aws:s3:::sigmetum-backend-deploys-{env}/*
-s3:GetObject     → arn:aws:s3:::sigmetum-backend-deploys-{env}/*
-
-elasticbeanstalk:CreateApplicationVersion  → arn:aws:elasticbeanstalk:{region}:{account}:application/sigmetum-backend-{env}
-elasticbeanstalk:UpdateEnvironment         → arn:aws:elasticbeanstalk:{region}:{account}:environment/sigmetum-backend-{env}/sigmetum-backend-{env}-env
-elasticbeanstalk:DescribeEnvironments      → * (la API no admite scope por recurso)
-elasticbeanstalk:DescribeEvents            → * (ídem)
+s3:PutObject    → arn:aws:s3:::sigmetum-backend-deploys-{env}/*
+s3:GetObject    → arn:aws:s3:::sigmetum-backend-deploys-{env}/*
+elasticbeanstalk:CreateApplicationVersion → arn:...:application/sigmetum-backend-{env}
+elasticbeanstalk:UpdateEnvironment        → arn:...:environment/sigmetum-backend-{env}/sigmetum-backend-{env}-env
+elasticbeanstalk:DescribeEnvironments     → * (la API no admite scope por recurso)
+elasticbeanstalk:DescribeEvents           → * (ídem)
 ```
 
-## 5. Buckets de artefactos
+## 6. Buckets de artefactos
 
-Dos buckets nuevos, separados del bucket de contenido web:
+Un bucket por cuenta, dedicado a los zips de despliegue:
 
-- `sigmetum-backend-deploys-dev`
-- `sigmetum-backend-deploys-prod`
+- cuenta dev → `sigmetum-backend-deploys-dev`
+- cuenta prod → `sigmetum-backend-deploys-prod`
 
-Configuración: cifrado SSE-S3, bloqueo de acceso público activado, sin versionado (los zips son efímeros).
+Configuración: cifrado SSE-S3, bloqueo de acceso público, sin versionado.
 
-### Permiso para el rol de servicio de Beanstalk
-
-Cuando GitHub Actions llama a `create-application-version`, Beanstalk descarga el zip usando `aws-elasticbeanstalk-service-role` — no el rol de CI. Ese rol de servicio necesita `s3:GetObject` sobre el bucket de deploys. Se añade una `aws_s3_bucket_policy` que lo permite:
+El rol de servicio de Beanstalk (`aws-elasticbeanstalk-service-role`) necesita `s3:GetObject` sobre el bucket para descargar el zip. Se añade una `aws_s3_bucket_policy`:
 
 ```json
 {
@@ -84,50 +81,49 @@ Cuando GitHub Actions llama a `create-application-version`, Beanstalk descarga e
 }
 ```
 
-## 6. Variables en GitHub Actions
+## 7. Estructura Terraform
+
+```
+modules/
+  backend-ci-iam/   ← nuevo: OIDC provider + rol IAM + bucket de deploys + bucket policy
+environments/
+  dev/   ← instancia backend-ci-iam → crea todo en la cuenta dev
+  prod/  ← instancia backend-ci-iam → crea todo en la cuenta prod
+```
+
+No hay módulo separado para el OIDC provider: al ser cuentas distintas, el módulo se instancia de forma independiente en cada entorno sin colisión.
+
+## 8. Variables en GitHub Actions
 
 | Variable (no secret) | Valor |
 |----------------------|-------|
-| `AWS_ROLE_DEV` | ARN de `sigmetum-backend-ci-dev` (output de Terraform) |
-| `AWS_ROLE_PROD` | ARN de `sigmetum-backend-ci-prod` (output de Terraform) |
+| `AWS_ROLE_DEV` | ARN de `sigmetum-backend-ci-dev` (output de Terraform, cuenta dev) |
+| `AWS_ROLE_PROD` | ARN de `sigmetum-backend-ci-prod` (output de Terraform, cuenta prod) |
 | `S3_BUCKET_DEV` | `sigmetum-backend-deploys-dev` |
 | `S3_BUCKET_PROD` | `sigmetum-backend-deploys-prod` |
 
 `AWS_REGION`, nombre de app EB y nombre de entorno EB van hardcodeados en el workflow.
 
-## 7. Estructura Terraform
-
-```
-modules/
-  github-oidc-provider/   ← nuevo: solo el aws_iam_openid_connect_provider
-  backend-ci-iam/         ← nuevo: roles IAM + buckets de deploys + bucket policies
-environments/
-  dev/   ← instancia backend-ci-iam (roles + buckets dev)
-  prod/  ← instancia backend-ci-iam (roles + buckets prod)
-  # github-oidc-provider se instancia UNA SOLA VEZ, en dev o en un entorno shared/
-```
-
-## 8. Cambios en `sigmetum-backend`
+## 9. Cambios en `sigmetum-backend`
 
 - Job `deploy` en `.github/workflows/ci.yml` con `needs: verify`.
-- Condición explícita `if: github.event_name == 'push'` para que no corra en PRs.
-- Usa `aws-actions/configure-aws-credentials@v4` con `role-to-assume` (OIDC).
+- `if: github.event_name == 'push'` para que no corra en PRs.
+- `aws-actions/configure-aws-credentials@v4` con `role-to-assume` (OIDC).
 
-## 9. Recursos que deben existir antes de que el workflow funcione
+## 10. Recursos que deben existir antes de que el workflow funcione
 
 | Recurso | Ya existe | Lo crea |
 |---------|-----------|---------|
-| Beanstalk app + env | Sí | `terraform apply` existente |
-| OIDC provider de GitHub | **No** | `modules/github-oidc-provider` (una vez) |
-| IAM role `sigmetum-backend-ci-dev` | **No** | `modules/backend-ci-iam` en dev |
-| IAM role `sigmetum-backend-ci-prod` | **No** | `modules/backend-ci-iam` en prod |
-| S3 `sigmetum-backend-deploys-dev` | **No** | `modules/backend-ci-iam` en dev |
-| S3 `sigmetum-backend-deploys-prod` | **No** | `modules/backend-ci-iam` en prod |
+| Beanstalk app + env (ambas cuentas) | Sí | `terraform apply` existente |
+| OIDC provider (cuenta dev) | **No** | `backend-ci-iam` en `environments/dev/` |
+| OIDC provider (cuenta prod) | **No** | `backend-ci-iam` en `environments/prod/` |
+| Rol + bucket (cuenta dev) | **No** | `backend-ci-iam` en `environments/dev/` |
+| Rol + bucket (cuenta prod) | **No** | `backend-ci-iam` en `environments/prod/` |
 
-## 10. Orden (primera puesta en marcha)
+## 11. Orden (primera puesta en marcha)
 
-1. `terraform apply` en dev (crea OIDC provider + rol dev + bucket dev).
-2. `terraform apply` en prod (crea rol prod + bucket prod — el OIDC provider ya existe).
+1. `terraform apply` en `environments/dev/` → crea OIDC provider, rol y bucket en la cuenta dev.
+2. `terraform apply` en `environments/prod/` → ídem en la cuenta prod.
 3. Copiar ARN de outputs a variables de GitHub Actions del repo backend.
 4. Push a `feature/testing` → verificar deploy a dev.
 5. Push a `master` → verificar deploy a prod.
