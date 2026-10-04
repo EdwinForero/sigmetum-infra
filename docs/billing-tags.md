@@ -9,7 +9,7 @@ Todos los recursos tienen tags aplicados automáticamente por Terraform. Para qu
 | `Project` | `sigmetum` | Filtra todos los costos del proyecto |
 | `Environment` | `dev` / `prod` | Compara costos entre preprod y prod |
 | `ManagedBy` | `terraform` | Identifica recursos gestionados por IaC |
-| `Component` | `backend` / `frontend` / `storage` | Desglosa costos por servicio |
+| `Component` | `backend` / `frontend` / `storage` / `backend-ci` | Desglosa costos por servicio |
 
 Con estos tags puedes responder preguntas como:
 - ¿Cuánto cuesta el backend en preprod este mes?

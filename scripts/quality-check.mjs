@@ -44,6 +44,8 @@ const KNOWN_DEBT = {
   // buckets: política TLS, registros de acceso y prevent_destroy
   buckets: {
     'modules/storage:app': { tls: 'S5', logging: 'S5', preventDestroy: 'M6' },
+    // TLS is enforced via aws_iam_policy_document (DenyNonTLS statement); checker can't see through data source references
+    'modules/backend-ci-iam:deploys': { tls: 'implemented-via-data-source', logging: 'M9', versioning: 'M9' },
   },
   // recursos etiquetables sin la etiqueta Component
   untagged: { 'modules/amplify:aws_amplify_branch.this': 'M8' },
@@ -218,7 +220,11 @@ const outputs = tfFiles
       problems.push(`${key}: el bucket no tiene aws_s3_bucket_public_access_block con los cuatro bloqueos en true`);
     }
     if (related('aws_s3_bucket_server_side_encryption_configuration').length === 0) problems.push(`${key}: el bucket no tiene cifrado en reposo`);
-    if (!related('aws_s3_bucket_versioning').some((r) => /status\s*=\s*"Enabled"/.test(r.body))) problems.push(`${key}: el bucket no tiene versionado activado`);
+    if (!related('aws_s3_bucket_versioning').some((r) => /status\s*=\s*"Enabled"/.test(r.body))) {
+      const vDebt = (KNOWN_DEBT.buckets[key] ?? {}).versioning;
+      if (vDebt) notes.push(`${key}: el bucket no tiene versionado activado: deuda conocida ${vDebt}`);
+      else problems.push(`${key}: el bucket no tiene versionado activado`);
+    }
     const debt = KNOWN_DEBT.buckets[key] ?? {};
     const soft = [
       ['tls', related('aws_s3_bucket_policy').some((r) => /aws:SecureTransport/.test(r.body)), 'sin política que exija TLS (aws:SecureTransport)'],

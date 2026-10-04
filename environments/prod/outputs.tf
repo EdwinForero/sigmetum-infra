@@ -13,3 +13,13 @@ output "amplify_url" {
 output "s3_bucket" {
   value = module.storage.bucket_name
 }
+
+output "ci_role_arn" {
+  description = "ARN of the IAM role for GitHub Actions CI. Set as AWS_ROLE_PROD in GitHub Actions variables."
+  value       = module.backend_ci_iam.role_arn
+}
+
+output "ci_bucket_name" {
+  description = "S3 bucket for deployment artifacts."
+  value       = module.backend_ci_iam.bucket_name
+}

@@ -1,3 +1,8 @@
+variable "account_id" {
+  description = "AWS account ID for this environment."
+  type        = string
+}
+
 variable "notification_email" {
   type = string
 }

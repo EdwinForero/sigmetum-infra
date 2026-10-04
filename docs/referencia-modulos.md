@@ -130,6 +130,27 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 | `zone_id` | Id de la zona de Route53 |
 | `backend_fqdn` | Nombre completo del registro del backend |
 
+## Módulo backend-ci-iam
+
+Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en Beanstalk, el proveedor OIDC de GitHub (recurso de cuenta) y el bucket S3 de artefactos de deploy. Se instancia en cada entorno de forma independiente (dev y prod son cuentas AWS separadas).
+
+### Variables
+
+| Variable | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `environment` | string | — | Entorno de despliegue: dev o prod |
+| `account_id` | string | — | ID de la cuenta AWS de este entorno |
+| `github_repo` | string | — | Repositorio GitHub en formato `owner/name` |
+| `github_branch` | string | — | Rama que puede asumir el rol CI |
+| `aws_region` | string | — | Región AWS donde viven los recursos de Beanstalk |
+
+### Outputs
+
+| Output | Descripción |
+|---|---|
+| `role_arn` | ARN del rol IAM para GitHub Actions. Configurar como `AWS_ROLE_{ENV}` en GitHub Actions variables |
+| `bucket_name` | Nombre del bucket de artefactos. Configurar como `S3_BUCKET_{ENV}` en GitHub Actions variables |
+
 ## Entorno dev
 
 `environments/dev`: instancia única sin balanceador, Amplify en la rama `feature/testing`. Estado remoto en el bucket de la cuenta de preprod. Plantilla de valores: `environments/dev/terraform.tfvars.example`.
@@ -138,6 +159,7 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 
 | Variable | Tipo | Por defecto | Descripción |
 |---|---|---|---|
+| `account_id` | string | — | ID de la cuenta AWS de este entorno |
 | `notification_email` | string | — | Correo de notificaciones de Beanstalk |
 | `bucket_name` | string | — | Nombre del bucket S3 |
 | `ssl_certificate_arn` | string | `""` | Declarada pero sin uso en `dev` |
@@ -154,6 +176,8 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 | `amplify_url` | URL de la rama de Amplify |
 | `s3_bucket` | Nombre del bucket |
 | `cdn_url` | URL HTTPS de CloudFront para los assets del frontend |
+| `ci_role_arn` | ARN del rol IAM para GitHub Actions CI (de `module.backend_ci_iam`) |
+| `ci_bucket_name` | Nombre del bucket de artefactos de deploy (de `module.backend_ci_iam`) |
 
 ## Entorno prod
 
@@ -163,6 +187,7 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 
 | Variable | Tipo | Por defecto | Descripción |
 |---|---|---|---|
+| `account_id` | string | — | ID de la cuenta AWS de este entorno |
 | `notification_email` | string | — | Correo de notificaciones de Beanstalk |
 | `bucket_name` | string | — | Nombre del bucket S3 |
 | `ssl_certificate_arn` | string | — | Certificado ACM, en la misma región que el proveedor |
@@ -178,6 +203,8 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 | `backend_fqdn` | Dominio del backend en Route53 |
 | `amplify_url` | URL de la rama de Amplify |
 | `s3_bucket` | Nombre del bucket |
+| `ci_role_arn` | ARN del rol IAM para GitHub Actions CI (de `module.backend_ci_iam`) |
+| `ci_bucket_name` | Nombre del bucket de artefactos de deploy (de `module.backend_ci_iam`) |
 
 ## app_env_vars
 

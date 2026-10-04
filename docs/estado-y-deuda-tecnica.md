@@ -13,12 +13,12 @@ Se actualizan con `node scripts/docs-check.mjs --metrics`. El script falla si es
 
 | Métrica | Valor |
 |---|---|
-| Módulos | 5 |
+| Módulos | 6 |
 | Entornos | 2 |
-| Archivos .tf | 25 |
-| Variables de módulos | 27 |
-| Outputs de módulos | 15 |
-| Recursos declarados | 14 |
+| Archivos .tf | 28 |
+| Variables de módulos | 32 |
+| Outputs de módulos | 17 |
+| Recursos declarados | 21 |
 | Claves de app_env_vars | 10 |
 
 ## Abiertos
@@ -67,6 +67,7 @@ Prefijos y ciclo de vida en [mantenimiento.md](guias/mantenimiento.md#5-hallazgo
 | **M7** | Baja | Varias variables no tienen `description`, solo una tiene `validation` y la mayoría de los outputs no tiene `description`; varios outputs de módulo no los consume ningún entorno. Las claves de `app_env_vars` no se validan (C5) | `modules/*/variables.tf`, `environments/*/variables.tf`, `outputs.tf` | Añadir descripciones, una `validation` de claves obligatorias y podar outputs. El listado está en `KNOWN_DEBT` de `scripts/quality-check.mjs` | infra |
 | **M8** | Baja | `aws_amplify_branch` no lleva la etiqueta `Component`; los recursos manuales usan `Component=infrastructure`, que no figura en [billing-tags.md](billing-tags.md) | `modules/amplify/main.tf`, `docs/billing-tags.md` | Etiquetar la rama y documentar el valor `infrastructure` | infra |
 | **M9** | Media | La CI (`ci.yml`) existe, pero **(por confirmar)** si la rama principal exige que pase, exige revisión y tiene activados Dependabot security updates: son ajustes de GitHub que no están en el código ([mantenimiento.md](guias/mantenimiento.md#37-github-ci-plantilla-de-pr-y-ajustes-que-no-están-en-el-código)). El trabajo `trivy config` es **informativo** (`continue-on-error`) hasta limpiar la línea base (S3, S5, S9...); después debe pasar a bloquear. `CODEOWNERS` es una propuesta con el marcador `@equipo-infra` sin sustituir | `.github/` y ajustes de GitHub | Activar la protección de rama, sustituir el marcador, y quitar `continue-on-error` cuando la línea base esté limpia | infra |
+| **M9** | Baja | El bucket de artefactos de deploy (`sigmetum-backend-deploys-*`) no tiene registros de acceso ni versionado. Los zips son efímeros así que el versionado no aplica; los registros de acceso son mejora futura **(verificado)** | `modules/backend-ci-iam/main.tf` | Añadir un bucket de logs y un bloque `logging {}` cuando se tenga bucket de logs centralizado | infra |
 | **M10** | Baja | Mejora futura: rol OIDC de solo lectura para publicar el `terraform plan` de preprod en la PR. El `apply` seguirá siendo manual con confirmación expresa | `.github/workflows/ci.yml` | Diseñar el rol con permisos de solo lectura y sin acceso a secretos ([SEG-4](guias/seguridad.md)) | infra |
 | **B2** | Baja | El README y las guías mezclan inglés y español | [README](../README.md) | Unificar el idioma (la política es español) | infra |
 

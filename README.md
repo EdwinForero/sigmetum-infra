@@ -13,8 +13,9 @@ modules/
   networking/  — default VPC and subnets (data sources only)
   beanstalk/   — Elastic Beanstalk app + environment (+ CloudFront proxy en dev)
   storage/     — S3 bucket + CloudFront OAC + IAM policy for EB instance access
-  amplify/     — Amplify app + branch + build spec
-  dns/         — Route53 CNAME (prod only)
+  amplify/         — Amplify app + branch + build spec
+  dns/             — Route53 CNAME (prod only)
+  backend-ci-iam/  — GitHub Actions OIDC role + S3 artifact bucket for Beanstalk CI deploys
 ```
 
 | Resource | Dev | Prod |
@@ -28,6 +29,7 @@ modules/
 | Load balancer | None (single instance) | ALB |
 | HTTPS | No (CloudFront proxy para dev, sin ACM) | Yes (ACM en ALB) |
 | DNS | — | `backend.sigmetum-a.org` |
+| CI artifacts bucket | `sigmetum-backend-deploys-dev` | `sigmetum-backend-deploys-prod` |
 | Region | eu-west-3 | eu-west-3 |
 
 Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)

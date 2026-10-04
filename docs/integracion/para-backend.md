@@ -70,11 +70,15 @@ La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role`
 
 ## 7. `ALLOWED_ORIGIN` por entorno
 
-El backend usa CORS con **un único origen exacto** (`cors({ origin: process.env.ALLOWED_ORIGIN })`, `index.js`, verificado). Debe ser el dominio del frontend de ese mismo entorno:
+El backend acepta **una lista de orígenes separados por coma** en `ALLOWED_ORIGIN`. La función CORS en `index.js` divide el valor por `,`, elimina espacios, e invoca el callback con `true` si el origen del request está en la lista o si no hay origen (llamadas server-side). Si no coincide, rechaza con error (verificado).
 
-| Entorno | Origen que debería llevar `ALLOWED_ORIGIN` | Estado |
+```
+ALLOWED_ORIGIN = "https://feature-testing.d37662kpg8985h.amplifyapp.com,https://main.d37662kpg8985h.amplifyapp.com"
+```
+
+| Entorno | Qué poner en `ALLOWED_ORIGIN` | Estado |
 |---|---|---|
-| `dev` | La URL real de la rama `feature/testing` en Amplify (el output `branch_url` puede no coincidir, infra:C8) | Por fijar tras corregir infra:C8 |
+| `dev` | URL(s) de las ramas activas en Amplify, separadas por coma | Por fijar — añadir la URL de cada rama que necesite acceder al API |
 | `prod` | El dominio del frontend en `prod`, que hoy no existe (infra:C9) | Por fijar tras crear el dominio |
 
 Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN` depende de una URL que solo se conoce después de desplegar Amplify.
@@ -87,7 +91,28 @@ Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN`
 | **B2** | La política IAM de S3 da escritura y borrado sobre todo el bucket, más permiso del que usa el código | `modules/storage/main.tf` | infra | Limitar a los prefijos de `config/s3Paths.js` (también registrado como [S7](../estado-y-deuda-tecnica.md#abiertos)) |
 | **B3** | ~~`package.json` del backend no fija `engines.node`~~  | `../sigmetum-backend/package.json` | backend | **Resuelto (03/10/2026):** `"engines": { "node": "22.x" }` añadido |
 
-## 9. Si cambias algo (en `sigmetum-infra`)
+## 9. CI: despliegue automático desde GitHub Actions
+
+Push a `feature/testing` → despliega en `sigmetum-backend-dev-env`. Push a `master` → despliega en `sigmetum-backend-prod-env`. El deploy solo ocurre si el job `verify` (lint, quality, docs:check) pasa.
+
+**Autenticación:** OIDC — sin claves de AWS en GitHub. El rol IAM `sigmetum-backend-ci-{env}` se crea con Terraform (`modules/backend-ci-iam/`) y su ARN aparece en el output `ci_role_arn` de cada entorno.
+
+**Variables que hay que configurar en GitHub Actions del repo backend** (Settings → Variables):
+
+| Variable | Valor (output de Terraform) |
+|----------|-----------------------------|
+| `AWS_ROLE_DEV` | output `ci_role_arn` del entorno dev |
+| `AWS_ROLE_PROD` | output `ci_role_arn` del entorno prod |
+| `S3_BUCKET_DEV` | `sigmetum-backend-deploys-dev` |
+| `S3_BUCKET_PROD` | `sigmetum-backend-deploys-prod` |
+
+**Puesta en marcha:**
+1. `terraform apply` en `environments/dev/` → crea OIDC provider, rol y bucket en la cuenta dev.
+2. `terraform apply` en `environments/prod/` → ídem en la cuenta prod.
+3. Copiar los ARN de `ci_role_arn` a las variables de GitHub Actions.
+4. Hacer push a cada rama para verificar el pipeline.
+
+## 10. Si cambias algo (en `sigmetum-infra`)
 
 | Si cambias... | Actualiza en este documento | Avisa |
 |---|---|---|
@@ -96,6 +121,7 @@ Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN`
 | El ALB, el certificado o el DNS | Sección 4 | PR: nuevo dominio o URL |
 | La política IAM de `modules/storage` | Sección 5 | PR: qué acciones o prefijos cambian |
 | El tipo de instancia | Sección 6 | PR: motivo (coste o capacidad) |
+| `modules/backend-ci-iam` (rol, bucket, permisos) | Sección 9 | PR: qué cambió y si hay que actualizar variables en GitHub |
 
 ## 10. Mantener este documento
 
