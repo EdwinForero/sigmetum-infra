@@ -21,7 +21,7 @@ Este enfoque (rol manual + `assume_role`) es útil si en el futuro quieres corre
 
 ## Before you start — set the correct region
 
-> **Every time you open the AWS Console, verify the region in the top-right corner is set to `eu-west-1` (Ireland) before doing anything.**
+> **Every time you open the AWS Console, verify the region in the top-right corner is set to `eu-west-3` (Paris) before doing anything.**
 
 ---
 
@@ -57,7 +57,7 @@ Add `assume_role` to `providers.tf`:
 
 ```hcl
 provider "aws" {
-  region = "eu-west-1"
+  region = "eu-west-3"
 
   assume_role {
     role_arn = "arn:aws:iam::<ACCOUNT_ID>:role/sigmetum-terraform-role"
