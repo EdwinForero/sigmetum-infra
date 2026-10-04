@@ -8,5 +8,6 @@ output "default_domain" {
 }
 
 output "branch_url" {
-  value = "https://${var.branch}.${aws_amplify_app.this.default_domain}"
+  # Amplify replaces "/" with "-" in branch names for the subdomain
+  value = "https://${replace(var.branch, "/", "-")}.${aws_amplify_app.this.default_domain}"
 }
