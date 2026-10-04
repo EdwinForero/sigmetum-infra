@@ -68,6 +68,20 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
+  # Beanstalk delegates these bucket-config calls to the caller role on UpdateEnvironment
+  statement {
+    sid    = "EBStagingBucketConfig"
+    effect = "Allow"
+    actions = [
+      "s3:PutBucketOwnershipControls",
+      "s3:PutBucketAcl",
+      "s3:PutBucketPolicy",
+    ]
+    resources = [
+      "arn:aws:s3:::${local.eb_bucket}",
+    ]
+  }
+
   statement {
     sid    = "BeanstalkDeploy"
     effect = "Allow"

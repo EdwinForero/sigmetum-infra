@@ -47,8 +47,8 @@ const KNOWN_DEBT = {
     // TLS is enforced via aws_iam_policy_document (DenyNonTLS statement); checker can't see through data source references
     'modules/backend-ci-iam:deploys': { tls: 'implemented-via-data-source', logging: 'M9', versioning: 'M9' },
   },
-  // recursos etiquetables sin la etiqueta Component
-  untagged: { 'modules/amplify:aws_amplify_branch.this': 'M8' },
+  // recursos etiquetables sin la etiqueta Component — M8 resuelto; objeto vacío retenido para estructura
+  untagged: {},
   // variables sin description (todas tienen type)
   noDescription: {
     id: 'M7',

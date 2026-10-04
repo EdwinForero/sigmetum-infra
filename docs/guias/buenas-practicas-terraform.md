@@ -51,7 +51,7 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 - **Regla:** `default_tags` del proveedor con `Project`, `Environment` y `ManagedBy`, y `Component` (`backend`, `frontend`, `storage`) en cada recurso que admita etiquetas. Los recursos creados a mano (buckets de estado, roles) llevan las mismas etiquetas.
 - **Por qué:** Cost Explorer reparte los costes por etiqueta ([billing-tags.md](../billing-tags.md)); un recurso sin ella queda en "sin asignar".
 - **Cómo:** `quality-check` exige `Component` en los recursos etiquetables de los módulos y las tres etiquetas en `default_tags`. `docs-check` comprueba que figuren en `billing-tags.md`.
-- **Estado:** cumple salvo `aws_amplify_branch`, que no lleva `Component` (M8). Los recursos manuales usan `Component=infrastructure`, valor que no figura en `billing-tags.md` (M8).
+- **Estado:** cumple en todos los recursos etiquetables, incluida `aws_amplify_branch` (M8 resuelto). Los recursos manuales usan `Component=infrastructure`, valor que no figura en `billing-tags.md`.
 
 ### BP-7. Flujo de cambio
 
@@ -126,7 +126,7 @@ Lo que no se debe imitar y ya está registrado:
 | Secretos en `.tf`, ejemplos y documentos | Ninguno (`quality-check`) |
 | Bloqueo de concurrencia y `encrypt` en el estado | No (S3) |
 | `prevent_destroy` en el bucket de datos | No (M6) |
-| Etiqueta `Component` | En todos los recursos etiquetables salvo la rama de Amplify (M8) |
+| Etiqueta `Component` | En todos los recursos etiquetables (M8 resuelto) |
 | Integración continua | `ci.yml` sin credenciales de AWS; escaneo `trivy config` informativo (M9) |
 
 ## 3. Lista de comprobación para una PR

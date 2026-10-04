@@ -57,6 +57,10 @@ resource "aws_amplify_branch" "this" {
 
   enable_auto_build = true
 
+  tags = {
+    Component = "frontend"
+  }
+
   environment_variables = {
     VITE_BASE_URL            = var.backend_url
     VITE_API_PREFIX          = "/api/v1"
