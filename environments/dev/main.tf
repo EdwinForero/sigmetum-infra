@@ -32,7 +32,7 @@ module "backend_ci_iam" {
 
   environment   = "dev"
   github_repo   = "edwinmenfor2000/sigmetum-backend"
-  github_branch = "feature/testing"
+  github_branch = "feature/sigmetum_v2"
   aws_region    = "eu-west-3"
 }
 
