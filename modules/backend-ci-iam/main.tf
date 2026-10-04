@@ -2,7 +2,6 @@ data "aws_caller_identity" "current" {}
 
 locals {
   account_id = data.aws_caller_identity.current.account_id
-  eb_bucket  = "elasticbeanstalk-${var.aws_region}-${local.account_id}"
   eb_app_arn = "arn:aws:elasticbeanstalk:${var.aws_region}:${local.account_id}:application/sigmetum-backend-${var.environment}"
   eb_env_arn = "arn:aws:elasticbeanstalk:${var.aws_region}:${local.account_id}:environment/sigmetum-backend-${var.environment}/sigmetum-backend-${var.environment}-env"
 }
@@ -51,56 +50,49 @@ resource "aws_iam_role" "backend_ci" {
   tags = { Component = "backend-ci" }
 }
 
+# ── CI deploy policy ──────────────────────────────────────────────────────────
+# Derived from AdministratorAccess-AWSElasticBeanstalk v10 (May 2026),
+# trimmed to services this project uses (no RDS, ECS, CodeBuild).
 data "aws_iam_policy_document" "backend_ci" {
-  # Beanstalk staging bucket: CreateBucket in case it doesn't exist yet,
-  # PutObject/GetObject for the source bundle
+
+  # Read-only actions that do not support resource-level restrictions
   statement {
-    sid    = "EBStagingBucket"
+    sid    = "EBReadOnly"
     effect = "Allow"
     actions = [
-      "s3:CreateBucket",
-      "s3:PutObject",
-      "s3:GetObject",
-      "s3:ListBucket",
-      "s3:GetBucketLocation",
-      "s3:GetObjectAcl",
-      "s3:PutObjectAcl",
-      "s3:DeleteObject",
-      "s3:GetBucketPolicy",
-      "s3:GetBucketAcl",
-      "s3:GetBucketCORS",
-      "s3:GetBucketVersioning",
-      "s3:GetEncryptionConfiguration",
-      "s3:GetLifecycleConfiguration",
-      "s3:GetBucketObjectLockConfiguration",
+      "autoscaling:Describe*",
+      "cloudformation:Describe*",
+      "cloudformation:Estimate*",
+      "cloudformation:Get*",
+      "cloudformation:List*",
+      "cloudformation:Validate*",
+      "cloudwatch:DescribeAlarms",
+      "cloudwatch:GetMetricStatistics",
+      "cloudwatch:ListMetrics",
+      "ec2:Describe*",
+      "elasticbeanstalk:Describe*",
+      "elasticloadbalancing:Describe*",
+      "iam:GetRole",
+      "iam:ListAttachedRolePolicies",
+      "iam:ListInstanceProfiles",
+      "iam:ListRolePolicies",
+      "iam:ListRoles",
+      "logs:Describe*",
+      "s3:ListAllMyBuckets",
+      "sns:ListSubscriptionsByTopic",
+      "sns:ListTopics",
     ]
-    resources = [
-      "arn:aws:s3:::${local.eb_bucket}",
-      "arn:aws:s3:::${local.eb_bucket}/*",
-    ]
+    resources = ["*"]
   }
 
-  # Beanstalk delegates these bucket-config calls to the caller role on UpdateEnvironment
-  statement {
-    sid    = "EBStagingBucketConfig"
-    effect = "Allow"
-    actions = [
-      "s3:PutBucketOwnershipControls",
-      "s3:PutBucketAcl",
-      "s3:PutBucketPolicy",
-    ]
-    resources = [
-      "arn:aws:s3:::${local.eb_bucket}",
-    ]
-  }
-
+  # Elasticbeanstalk write — scoped to this app/env/version
   statement {
     sid    = "BeanstalkDeploy"
     effect = "Allow"
     actions = [
       "elasticbeanstalk:CreateApplicationVersion",
-      "elasticbeanstalk:UpdateEnvironment",
       "elasticbeanstalk:CreateStorageLocation",
+      "elasticbeanstalk:UpdateEnvironment",
     ]
     resources = [
       local.eb_app_arn,
@@ -109,108 +101,150 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
-  # Beanstalk delegates CloudFormation reads to the caller role on UpdateEnvironment
+  # S3 objects in any elasticbeanstalk-* bucket (CF reads templates from here)
   statement {
-    sid    = "EBCloudFormationRead"
+    sid    = "EBBucketObjects"
     effect = "Allow"
     actions = [
+      "s3:Delete*",
+      "s3:Get*",
+      "s3:Put*",
+    ]
+    resources = ["arn:aws:s3:::elasticbeanstalk-*/*"]
+  }
+
+  # S3 bucket-level operations on elasticbeanstalk-* buckets
+  statement {
+    sid    = "EBBucketLevel"
+    effect = "Allow"
+    actions = [
+      "s3:CreateBucket",
+      "s3:GetBucket*",
+      "s3:ListBucket",
+      "s3:PutBucketPolicy",
+      "s3:PutBucketPublicAccessBlock",
+      "s3:PutBucketOwnershipControls",
+    ]
+    resources = ["arn:aws:s3:::elasticbeanstalk-*"]
+  }
+
+  # CloudFormation write on awseb-* stacks (EB manages these internally)
+  statement {
+    sid    = "EBCloudFormation"
+    effect = "Allow"
+    actions = [
+      "cloudformation:CancelUpdateStack",
+      "cloudformation:ContinueUpdateRollback",
+      "cloudformation:CreateStack",
+      "cloudformation:DeleteStack",
       "cloudformation:GetTemplate",
+      "cloudformation:ListStackResources",
+      "cloudformation:SignalResource",
+      "cloudformation:TagResource",
+      "cloudformation:UntagResource",
       "cloudformation:UpdateStack",
-      "cloudformation:DescribeStackResource",
-      "cloudformation:DescribeStackResources",
-      "cloudformation:DescribeStacks",
     ]
     resources = [
       "arn:aws:cloudformation:${var.aws_region}:${local.account_id}:stack/awseb-*",
     ]
   }
 
-  # SNS topics that EB creates/reads for environment notifications
+  # AutoScaling write scoped to EB-managed resources
   statement {
-    sid    = "EBSnsNotifications"
+    sid     = "EBAutoScaling"
+    effect  = "Allow"
+    actions = ["autoscaling:*"]
+    resources = [
+      "arn:aws:autoscaling:${var.aws_region}:${local.account_id}:launchConfiguration:*:launchConfigurationName/awseb-e-*",
+      "arn:aws:autoscaling:${var.aws_region}:${local.account_id}:autoScalingGroup:*:autoScalingGroupName/awseb-e-*",
+    ]
+  }
+
+  # CloudWatch alarms scoped to awseb-* (EB creates these for scaling)
+  statement {
+    sid    = "EBCloudWatchAlarms"
+    effect = "Allow"
+    actions = [
+      "cloudwatch:DeleteAlarms",
+      "cloudwatch:PutMetricAlarm",
+    ]
+    resources = [
+      "arn:aws:cloudwatch:${var.aws_region}:${local.account_id}:alarm:awseb-*",
+    ]
+  }
+
+  # SNS notifications topic for this environment
+  statement {
+    sid    = "EBSns"
     effect = "Allow"
     actions = [
       "sns:CreateTopic",
+      "sns:DeleteTopic",
       "sns:GetTopicAttributes",
-      "sns:ListSubscriptionsByTopic",
+      "sns:Publish",
+      "sns:SetTopicAttributes",
+      "sns:Subscribe",
+      "sns:Unsubscribe",
     ]
     resources = [
-      "arn:aws:sns:${var.aws_region}:${local.account_id}:ElasticBeanstalkNotifications-Environment-sigmetum-backend-${var.environment}-env",
+      "arn:aws:sns:${var.aws_region}:${local.account_id}:ElasticBeanstalkNotifications-*",
     ]
   }
 
-  # CloudWatch Logs: EB sets retention policy on its log groups
+  # CloudWatch Logs for EB log groups
   statement {
-    sid    = "EBCloudWatchLogs"
+    sid    = "EBLogs"
     effect = "Allow"
     actions = [
-      "logs:PutRetentionPolicy",
       "logs:CreateLogGroup",
-      "logs:DescribeLogGroups",
+      "logs:DeleteLogGroup",
+      "logs:PutRetentionPolicy",
     ]
     resources = [
-      "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/aws/elasticbeanstalk/sigmetum-backend-${var.environment}-env*",
+      "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/aws/elasticbeanstalk/*",
     ]
   }
 
-  # CloudFormation reads EB-managed templates from regional EB buckets (not only the account bucket)
-  statement {
-    sid    = "EBCFTemplateRead"
-    effect = "Allow"
-    actions = [
-      "s3:GetObject",
-      "s3:GetBucketLocation",
-      "s3:ListBucket",
-    ]
-    resources = [
-      "arn:aws:s3:::elasticbeanstalk-*",
-      "arn:aws:s3:::elasticbeanstalk-*/*",
-    ]
-  }
-
-  # iam:PassRole — EB needs this to pass the EC2 instance profile role
+  # PassRole to EB/EC2/ASG/ELB/CF — condition limits scope to EB-related services
   statement {
     sid     = "EBPassRole"
     effect  = "Allow"
     actions = ["iam:PassRole"]
     resources = [
-      "arn:aws:iam::${local.account_id}:role/aws-elasticbeanstalk-ec2-role",
-      "arn:aws:iam::${local.account_id}:role/aws-elasticbeanstalk-service-role",
+      "arn:aws:iam::${local.account_id}:role/aws-elasticbeanstalk*",
     ]
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values = [
+        "elasticbeanstalk.amazonaws.com",
+        "ec2.amazonaws.com",
+        "autoscaling.amazonaws.com",
+        "elasticloadbalancing.amazonaws.com",
+        "cloudformation.amazonaws.com",
+      ]
+    }
   }
 
-  # Actions that do not support resource-level restrictions
+  # Create service-linked roles that EB needs if they don't exist yet
   statement {
-    sid    = "EBAndASGDescribe"
-    effect = "Allow"
-    actions = [
-      "autoscaling:DescribeAutoScalingGroups",
-      "autoscaling:DescribeLaunchConfigurations",
-      "autoscaling:DescribeScalingActivities",
-      "autoscaling:SuspendProcesses",
-      "autoscaling:ResumeProcesses",
-      "cloudformation:CancelUpdateStack",
-      "cloudformation:DescribeStackEvents",
-      "cloudformation:ListStackResources",
-      "ec2:DescribeAccountAttributes",
-      "ec2:DescribeImages",
-      "ec2:DescribeInstances",
-      "ec2:DescribeInstanceAttribute",
-      "ec2:DescribeKeyPairs",
-      "ec2:DescribeLaunchTemplates",
-      "ec2:DescribeLaunchTemplateVersions",
-      "ec2:DescribeSecurityGroups",
-      "ec2:DescribeSubnets",
-      "ec2:DescribeVpcs",
-      "elasticbeanstalk:DescribeApplicationVersions",
-      "elasticbeanstalk:DescribeConfigurationOptions",
-      "elasticbeanstalk:DescribeConfigurationSettings",
-      "elasticbeanstalk:DescribeEnvironments",
-      "elasticbeanstalk:DescribeEnvironmentResources",
-      "elasticbeanstalk:DescribeEvents",
-      "sns:Subscribe",
+    sid     = "EBServiceLinkedRoles"
+    effect  = "Allow"
+    actions = ["iam:CreateServiceLinkedRole"]
+    resources = [
+      "arn:aws:iam::${local.account_id}:role/aws-service-role/autoscaling.amazonaws.com/AWSServiceRoleForAutoScaling",
+      "arn:aws:iam::${local.account_id}:role/aws-service-role/elasticbeanstalk.amazonaws.com/AWSServiceRoleForElasticBeanstalk",
+      "arn:aws:iam::${local.account_id}:role/aws-service-role/elasticloadbalancing.amazonaws.com/AWSServiceRoleForElasticLoadBalancing",
     ]
-    resources = ["*"]
+    condition {
+      test     = "StringLike"
+      variable = "iam:AWSServiceName"
+      values = [
+        "autoscaling.amazonaws.com",
+        "elasticbeanstalk.amazonaws.com",
+        "elasticloadbalancing.amazonaws.com",
+      ]
+    }
   }
 }
 
