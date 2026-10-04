@@ -63,6 +63,7 @@ data "aws_iam_policy_document" "backend_ci" {
       "s3:GetObject",
       "s3:ListBucket",
       "s3:GetBucketLocation",
+      "s3:GetObjectAcl",
     ]
     resources = [
       "arn:aws:s3:::${local.eb_bucket}",
@@ -114,11 +115,25 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
-  # DescribeEnvironments and DescribeEvents do not support resource-level restrictions
+  # SNS topics that EB creates/reads for environment notifications
   statement {
-    sid    = "BeanstalkDescribe"
+    sid    = "EBSnsNotifications"
     effect = "Allow"
     actions = [
+      "sns:CreateTopic",
+      "sns:ListSubscriptionsByTopic",
+    ]
+    resources = [
+      "arn:aws:sns:${var.aws_region}:${local.account_id}:ElasticBeanstalkNotifications-Environment-sigmetum-backend-${var.environment}-env",
+    ]
+  }
+
+  # AutoScaling Describe* and DescribeEnvironments/Events do not support resource-level restrictions
+  statement {
+    sid    = "EBAndASGDescribe"
+    effect = "Allow"
+    actions = [
+      "autoscaling:DescribeAutoScalingGroups",
       "elasticbeanstalk:DescribeEnvironments",
       "elasticbeanstalk:DescribeEvents",
     ]
