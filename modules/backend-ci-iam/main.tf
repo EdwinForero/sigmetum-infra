@@ -138,6 +138,20 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
+  # CloudWatch Logs: EB sets retention policy on its log groups
+  statement {
+    sid    = "EBCloudWatchLogs"
+    effect = "Allow"
+    actions = [
+      "logs:PutRetentionPolicy",
+      "logs:CreateLogGroup",
+      "logs:DescribeLogGroups",
+    ]
+    resources = [
+      "arn:aws:logs:${var.aws_region}:${local.account_id}:log-group:/aws/elasticbeanstalk/sigmetum-backend-${var.environment}-env*",
+    ]
+  }
+
   # AutoScaling Describe* and DescribeEnvironments/Events do not support resource-level restrictions
   statement {
     sid    = "EBAndASGDescribe"
