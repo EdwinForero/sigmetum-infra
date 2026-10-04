@@ -51,9 +51,10 @@ cache:    node_modules/**/*
 | `VITE_BASE_URL` | App y rama | `backend_url` del entorno |
 | `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` del entorno (vacío hasta resolver infra:C2) |
+| `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` (vacío hasta resolver infra:C2) |
 | `NODE_ENV` | App | `dev` o `prod` |
 
-**(verificado en rama `feature/testing` de infra).** `VITE_CAROUSEL_IMAGE_KEYS` no se define (no aplica en dev; se añadirá si se usa en prod). El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
+**(verificado en rama `feature/testing` de infra).** El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
 
 ### Reglas de reescritura
 
@@ -92,7 +93,7 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
 
 | Necesidad | Detalle | Fuente |
 |---|---|---|
-| Node 20 | Vite 6 y los tests del frontend funcionan con Node 20 | `para-infra.md` del frontend, sección 2 |
+| Node compatible | Vite 6 y los tests del frontend; el `build_spec` no fija versión (infra:C10) | `para-infra.md` del frontend, sección 2 |
 | Instalación con `npm ci` | El `build_spec` ya lo hace | `modules/amplify/main.tf` |
 | Compilación con `npm run build` a `dist/` | El `build_spec` ya lo hace | `modules/amplify/main.tf` |
 | `npm test` en `preBuild` | No está hoy (infra:C10) | `para-infra.md` del frontend, sección 2 |
