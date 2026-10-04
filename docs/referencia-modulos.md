@@ -39,6 +39,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `vpc_id` | string | — | VPC donde se despliega |
 | `subnet_ids` | list(string) | — | Subredes de las instancias y del balanceador |
 | `load_balancer_type` | string | `application` | `single` (sin balanceador, dev) o `application` (ALB, prod) |
+| `enable_cdn` | bool | `false` | Crea una distribución CloudFront delante de Beanstalk como terminador HTTPS (solo dev; prod usa el ALB directamente) |
 | `ssl_certificate_arn` | string | `""` | Certificado ACM para el listener 443; solo se usa con `application` |
 | `ssh_key_name` | string | `""` | Par de claves EC2; vacío desactiva SSH |
 | `ssh_allowed_cidrs` | list(string) | `[]` | CIDR con acceso SSH; solo aplica si hay `ssh_key_name` |
@@ -53,10 +54,11 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `environment_name` | Nombre del entorno |
 | `application_name` | Nombre de la aplicación |
 | `load_balancers` | Balanceadores asociados al entorno |
+| `backend_cdn_url` | URL HTTPS de CloudFront del backend (vacío cuando `enable_cdn = false`; usar como `backend_url` en dev) |
 
 ## Módulo storage
 
-Bucket S3 privado con versionado y cifrado, y la política IAM que da acceso al rol de las instancias de Beanstalk.
+Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC para los assets públicos del frontend, y la política IAM que da acceso al rol de las instancias de Beanstalk.
 
 ### Variables
 
@@ -71,6 +73,7 @@ Bucket S3 privado con versionado y cifrado, y la política IAM que da acceso al 
 |---|---|
 | `bucket_name` | Nombre del bucket |
 | `bucket_arn` | ARN del bucket |
+| `cdn_url` | URL HTTPS de CloudFront para los assets del frontend (usar como `VITE_S3_URL`) |
 
 ## Módulo amplify
 
@@ -86,8 +89,8 @@ App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend. D
 | `github_access_token` | string | — | Token de GitHub con permiso `repo` (sensible) |
 | `branch` | string | `master` | Rama que se despliega |
 | `backend_url` | string | — | URL base del backend inyectada como `VITE_BASE_URL` |
-| `s3_url` | string | `""` | URL base de S3 o CloudFront inyectada como `VITE_S3_URL`; vacío hasta resolver C2 |
-| `carousel_image_keys` | string | `""` | Claves S3 separadas por comas inyectadas como `VITE_CAROUSEL_IMAGE_KEYS`; vacío hasta resolver C2 |
+| `s3_url` | string | `""` | URL base de CloudFront inyectada como `VITE_S3_URL`; usar `module.storage.cdn_url` |
+| `carousel_image_keys` | string | `""` | Claves S3 separadas por comas inyectadas como `VITE_CAROUSEL_IMAGE_KEYS` |
 
 ### Outputs
 
@@ -95,7 +98,7 @@ App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend. D
 |---|---|
 | `app_id` | Id de la app de Amplify |
 | `default_domain` | Dominio por defecto (`*.amplifyapp.com`) |
-| `branch_url` | URL de la rama (`https://<rama>.<dominio>`) |
+| `branch_url` | URL de la rama (`https://<rama>.<dominio>`); las `/` del nombre de rama se sustituyen por `-` |
 
 ### Variables de Amplify
 
@@ -105,8 +108,8 @@ Variables de entorno que el módulo define en la app y en la rama. Se comparan c
 |---|---|---|
 | `VITE_BASE_URL` | App y rama | `backend_url` |
 | `VITE_API_PREFIX` | App y rama | `/api` (fijo) |
-| `VITE_S3_URL` | App y rama | `s3_url` (vacío hasta resolver C2) |
-| `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` (vacío hasta resolver C2) |
+| `VITE_S3_URL` | App y rama | `s3_url` → `module.storage.cdn_url` (URL de CloudFront) |
+| `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` |
 | `NODE_ENV` | App | `environment` |
 
 ## Módulo dns
@@ -146,9 +149,11 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 
 | Output | Descripción |
 |---|---|
-| `beanstalk_url` | Endpoint de Beanstalk |
+| `beanstalk_url` | Endpoint de Beanstalk (CNAME, sin esquema) |
+| `backend_cdn_url` | URL HTTPS de CloudFront del backend (solo dev; `enable_cdn = true`) |
 | `amplify_url` | URL de la rama de Amplify |
 | `s3_bucket` | Nombre del bucket |
+| `cdn_url` | URL HTTPS de CloudFront para los assets del frontend |
 
 ## Entorno prod
 

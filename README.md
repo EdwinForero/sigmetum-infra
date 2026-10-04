@@ -4,7 +4,7 @@ Terraform infrastructure for the Sigmetum platform. Manages Elastic Beanstalk (N
 
 ## Architecture
 
-Diagramas: [dev](docs/arquitectura-dev.html) · [prod](docs/arquitectura-prod.html)
+Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
 
 ```
 environments/
