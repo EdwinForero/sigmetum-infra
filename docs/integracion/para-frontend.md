@@ -10,10 +10,10 @@ Documento para quien mantiene `sigmetum-frontend`. Convención y estructura en [
 
 | Id | Problema | Efecto | Estado |
 |---|---|---|---|
-| **infra:C1** (= `frontend:I1`) | Amplify define `VITE_API_URL`; el frontend lee `VITE_BASE_URL`, `VITE_API_PREFIX`, `VITE_S3_URL` | La web compilada llama a `localhost` | Abierto |
+| **infra:C1** (= `frontend:I1`) | Amplify define `VITE_API_URL`; el frontend lee `VITE_BASE_URL`, `VITE_API_PREFIX`, `VITE_S3_URL` | La web compilada llama a `localhost` | **Resuelto** (rama `feature/testing` de infra) |
 | **infra:C2** (= `frontend:I2`) | El bucket bloquea el acceso público y no hay CloudFront | Los recursos de `assets/…` dan 403 | Abierto |
-| **infra:C3** (= `frontend:I3`) | Sin regla de reescritura de la SPA en Amplify | Recargar `/explorar` da 404 | Abierto |
-| **infra:C4** (= `frontend:I4`) | `backend_url` de `dev` es `http://` | El navegador bloquea las peticiones (contenido mixto) | Abierto |
+| **infra:C3** (= `frontend:I3`) | Sin regla de reescritura de la SPA en Amplify | Recargar `/explorar` da 404 | **Resuelto** (rama `feature/testing` de infra) |
+| **infra:C4** (= `frontend:I4`) | `backend_url` de `dev` es `http://` | El navegador bloquea las peticiones (contenido mixto) | **Baja — aplazado hasta tener dominio dev** |
 | **infra:C7** (= `frontend:I7`) | Nada sube `assets/…` al bucket | Faltan logos y banner | Abierto |
 | **infra:C8** | `branch_url` no sustituye `/` por `-` en el nombre de rama | El origen real de `dev` probablemente no es el que calcula el output | Abierto (por confirmar) |
 | **infra:C9** (parte de `frontend:I4`) | Falta el dominio del frontend en prod (`modules/dns` solo crea `backend.<zona>`) | No hay `ALLOWED_ORIGIN` de prod para el backend | Abierto |
@@ -48,14 +48,26 @@ cache:    node_modules/**/*
 
 | Variable | Dónde | Valor |
 |---|---|---|
-| `VITE_API_URL` | App y rama | `backend_url` del entorno |
+| `VITE_BASE_URL` | App y rama | `backend_url` del entorno |
+| `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
+| `VITE_S3_URL` | App y rama | `s3_url` del entorno (vacío hasta resolver infra:C2) |
 | `NODE_ENV` | App | `dev` o `prod` |
 
-**(verificado).** No son las que el frontend lee (infra:C1). El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
+**(verificado en rama `feature/testing` de infra).** `VITE_CAROUSEL_IMAGE_KEYS` no se define (no aplica en dev; se añadirá si se usa en prod). El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
 
 ### Reglas de reescritura
 
-No hay ninguna hoy (infra:C3, verificado: no existe `custom_rule` en `modules/amplify/main.tf`). Cuando se añada, será la que propone la sección 6 de `para-infra.md` del frontend.
+`custom_rule` añadida **(verificado, rama `feature/testing` de infra)**:
+
+```hcl
+custom_rule {
+  source = "/<*>"
+  target = "/index.html"
+  status = "200"
+}
+```
+
+Resuelve infra:C3. La regla más específica que propone `para-infra.md` del frontend (sección 6) queda pendiente para cuando se añadan cabeceras de caché (infra:C11).
 
 ### Cabeceras
 

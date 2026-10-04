@@ -178,7 +178,7 @@ resource "aws_elastic_beanstalk_environment" "this" {
   setting {
     namespace = "aws:elasticbeanstalk:environment:process:default"
     name      = "HealthCheckPath"
-    value     = "/"
+    value     = "/healthcheck"
   }
   setting {
     namespace = "aws:elasticbeanstalk:environment:process:default"

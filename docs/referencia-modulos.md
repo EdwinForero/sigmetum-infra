@@ -85,7 +85,8 @@ App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend. D
 | `repository` | string | — | URL del repositorio de GitHub del frontend |
 | `github_access_token` | string | — | Token de GitHub con permiso `repo` (sensible) |
 | `branch` | string | `master` | Rama que se despliega |
-| `backend_url` | string | — | URL del backend que recibe el frontend |
+| `backend_url` | string | — | URL base del backend inyectada como `VITE_BASE_URL` |
+| `s3_url` | string | `""` | URL base de S3 o CloudFront inyectada como `VITE_S3_URL`; vacío hasta resolver C2 |
 
 ### Outputs
 
@@ -101,7 +102,9 @@ Variables de entorno que el módulo define en la app y en la rama. Se comparan c
 
 | Variable | Dónde | Valor |
 |---|---|---|
-| `VITE_API_URL` | App y rama | `backend_url` |
+| `VITE_BASE_URL` | App y rama | `backend_url` |
+| `VITE_API_PREFIX` | App y rama | `/api` (fijo) |
+| `VITE_S3_URL` | App y rama | `s3_url` (vacío hasta resolver C2) |
 | `NODE_ENV` | App | `environment` |
 
 ## Módulo dns

@@ -9,8 +9,8 @@ Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [m
 
 | Id | Problema | Efecto | Estado |
 |---|---|---|---|
-| **infra:C5** | `app_env_vars` no incluía `ALLOWED_ORIGIN`, `ADMIN_USERNAME` ni `ADMIN_PASSWORD` en el `terraform.tfvars` de dev (obligatorias en `validateEnv.js`) | El backend no arranca | Abierto |
-| **infra:C6** | `HealthCheckPath` de Beanstalk es `/`; el backend responde en `/healthcheck` | El entorno puede figurar como no saludable | Abierto |
+| **infra:C5** | `app_env_vars` no incluía `ALLOWED_ORIGIN`, `ADMIN_USERNAME` ni `ADMIN_PASSWORD` en el `terraform.tfvars` de dev (obligatorias en `validateEnv.js`) | El backend no arranca | **Parcialmente resuelto** — las plantillas `.example` y la referencia ya las incluyen; los `terraform.tfvars` reales (fuera de git) deben actualizarse por quien despliega |
+| **infra:C6** | `HealthCheckPath` de Beanstalk es `/`; el backend responde en `/healthcheck` | El entorno puede figurar como no saludable | **Resuelto** (rama `feature/testing` de infra) |
 | **backend:B1** | `index.js` no configura `trust proxy`; el límite de intentos de login es por IP | Detrás del ALB, todos los usuarios pueden compartir la misma IP vista por `express-rate-limit` | Abierto (por confirmar el efecto real) |
 
 ## 2. Contrato de entorno: `app_env_vars` frente a `validateEnv.js`
@@ -36,9 +36,9 @@ Las plantillas `environments/*/terraform.tfvars.example` de este repositorio ya 
 
 ## 3. Health check
 
-- Beanstalk comprueba `HealthCheckPath = "/"` (`modules/beanstalk/main.tf`, verificado).
-- El backend responde `200 ok` en `/healthcheck`; no define ninguna ruta en `/`, así que Express devuelve 404 (`index.js`, verificado).
-- Efecto en el estado del entorno: **(por confirmar)**.
+- Beanstalk comprueba `HealthCheckPath = "/healthcheck"` **(corregido en rama `feature/testing` de infra; antes era `/`)**.
+- El backend responde `200 ok` en `/healthcheck` (`index.js`, verificado). Resuelve infra:C6.
+- Efecto confirmado tras el primer despliegue: **(por confirmar)**.
 
 ## 4. HTTPS, ALB y DNS
 

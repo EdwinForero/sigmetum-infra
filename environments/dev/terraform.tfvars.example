@@ -1,27 +1,56 @@
-# Copy this file to terraform.tfvars and fill in the values.
-# terraform.tfvars is git-ignored — never commit real secrets.
-# Keys of app_env_vars: see docs/referencia-modulos.md
+# Copia este archivo a terraform.tfvars y rellena los valores.
+# terraform.tfvars está en .gitignore — nunca lo versiones.
+# Referencia completa de claves: docs/referencia-modulos.md
 
-notification_email  = "edwinmenfor2000@gmail.com"
-bucket_name         = "sigmetum-app-dev"
-github_repository   = "https://github.com/YOUR_ORG/sigmetum-frontend"
-github_access_token = "ghp_YOUR_TOKEN_HERE"
+# Correo que recibe las notificaciones SNS de Beanstalk (health, deploy).
+notification_email = "tu@email.com"
+
+# Nombre del bucket S3 de datos. Debe ser único globalmente en AWS.
+bucket_name = "sigmetum-app-dev"
+
+# URL del repositorio de GitHub del frontend que Amplify clonará.
+github_repository = "https://github.com/TU_ORG/sigmetum-frontend"
+
+# Token clásico de GitHub con scope "repo".
+# Genera uno en: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
+# Rótalo periódicamente (hallazgo S10). Usa el mismo valor en dev y prod.
+github_access_token = "ghp_CHANGE_ME"
 
 app_env_vars = {
-  PORT            = "8000"
-  AWS_REGION      = "eu-west-1"
+  # Puerto interno del proceso Node.js. Beanstalk redirige el 80 aquí vía nginx.
+  PORT = "8000"
+
+  # Región AWS donde está el bucket. Debe coincidir con la del proveedor Terraform.
+  AWS_REGION = "eu-west-1"
+
+  # Nombre del bucket S3 — debe coincidir con bucket_name de arriba.
   AWS_BUCKET_NAME = "sigmetum-app-dev"
 
-  JWT_SECRET     = "CHANGE_ME_strong_random_value"
+  # Clave secreta para firmar los JWT. Genera con: openssl rand -hex 32
+  # Usa un valor distinto en prod.
+  JWT_SECRET = "CHANGE_ME_openssl_rand_hex_32"
+
+  # Duración del token JWT (ej. "10m", "1h", "7d").
   JWT_EXPIRATION = "10m"
 
-  # Bcrypt hash of the admin password (never the plain text)
+  # Usuario del administrador inicial del sistema.
   ADMIN_USERNAME = "CHANGE_ME_admin_user"
+
+  # Hash bcrypt del password del admin. NUNCA el texto en claro.
+  # Genera con: node -e "require('bcryptjs').hash('tupassword',10).then(console.log)"
+  # (npm install -g bcryptjs si no lo tienes)
   ADMIN_PASSWORD = "CHANGE_ME_bcrypt_hash"
 
-  # Exact origin of the frontend of this environment (no trailing slash)
-  ALLOWED_ORIGIN = "https://CHANGE_ME_frontend_origin"
+  # Origen exacto del frontend, sin barra final. Usado para CORS.
+  # Primera vuelta de apply: deja vacío (""). Amplify genera la URL tras el apply;
+  # cópiala aquí y repite el apply.
+  # Formato: https://featuretesting.<id>.amplifyapp.com
+  ALLOWED_ORIGIN = ""
 
-  EMAIL          = "your@email.com"
-  EMAIL_PASSWORD = "your_app_password"
+  # Cuenta de correo desde la que el backend envía emails.
+  EMAIL = "tu@email.com"
+
+  # Contraseña de aplicación de Gmail (no la de tu cuenta).
+  # Genera en: Google → Cuenta → Seguridad → Verificación en dos pasos → Contraseñas de aplicación
+  EMAIL_PASSWORD = "CHANGE_ME_app_password"
 }

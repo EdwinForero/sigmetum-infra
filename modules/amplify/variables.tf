@@ -25,6 +25,12 @@ variable "branch" {
 }
 
 variable "backend_url" {
-  description = "Backend API URL injected as REACT_APP_API_URL (or equivalent)"
+  description = "Backend base URL injected as VITE_BASE_URL"
   type        = string
+}
+
+variable "s3_url" {
+  description = "Public S3 (or CloudFront) base URL injected as VITE_S3_URL"
+  type        = string
+  default     = ""
 }

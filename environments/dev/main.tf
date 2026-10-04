@@ -34,4 +34,6 @@ module "amplify" {
   github_access_token = var.github_access_token
   branch              = "feature/testing"
   backend_url         = "http://${module.beanstalk.endpoint_url}"
+  # s3_url left empty until C2 (S3 public access / CloudFront) is resolved
+  s3_url = ""
 }

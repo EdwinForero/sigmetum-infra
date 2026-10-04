@@ -29,8 +29,8 @@ module "storage" {
 }
 
 module "dns" {
-  source      = "../../modules/dns"
-  zone_name   = "sigmetum-a.org"
+  source    = "../../modules/dns"
+  zone_name = "sigmetum-a.org"
 
   # EB exposes a CNAME; if ALB is active, use load_balancers[0] for Alias record
   backend_cname_target = module.beanstalk.endpoint_url
@@ -44,4 +44,6 @@ module "amplify" {
   github_access_token = var.github_access_token
   branch              = "master"
   backend_url         = "https://backend.sigmetum-a.org"
+  # s3_url left empty until C2 (S3 public access / CloudFront) is resolved
+  s3_url = ""
 }
