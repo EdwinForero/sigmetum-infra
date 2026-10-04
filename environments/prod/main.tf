@@ -40,7 +40,7 @@ module "backend_ci_iam" {
   source = "../../modules/backend-ci-iam"
 
   environment   = "prod"
-  github_repo   = "edwinmenfor2000/sigmetum-backend"
+  github_repo   = "EdwinForero/sigmetum-backend"
   github_branch = "master"
   aws_region    = "eu-west-3"
 }
