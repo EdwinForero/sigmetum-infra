@@ -139,6 +139,7 @@ data "aws_iam_policy_document" "backend_ci" {
       "autoscaling:DescribeAutoScalingGroups",
       "ec2:DescribeImages",
       "ec2:DescribeSubnets",
+      "ec2:DescribeVpcs",
       "elasticbeanstalk:DescribeEnvironments",
       "elasticbeanstalk:DescribeEvents",
     ]
