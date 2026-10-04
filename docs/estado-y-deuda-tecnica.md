@@ -2,7 +2,7 @@
 
 Registro de hallazgos de `sigmetum-infra`, con su referencia cruzada al frontend y al backend. Es el **único** documento que contiene cifras del repositorio (ver [mantenimiento.md](guias/mantenimiento.md#1-la-regla)).
 
-- Fecha de la revisión: 30/09/2026. Rama `feature/testing`, sobre el commit `19bdde3` (con cambios sin confirmar).
+- Fecha de la revisión: 30/09/2026 (inicial). Última actualización: 04/10/2026, rama `feature/testing`, commit `c4e3cf6`.
 - Contrastado con: `sigmetum-frontend` (`docs/integracion/para-infra.md`, `.env.example`) y `sigmetum-backend` (commit `ace5367`: `config/validateEnv.js`, `index.js`).
 - Ningún `.tf` se ha modificado para esta revisión. Los `terraform.tfvars` reales no se han leído: solo se comprobaron los **nombres** de las claves del de `dev`.
 - **(verificado)** = comprobado contra el código de este repositorio o de los hermanos. **(por confirmar)** = depende de la cuenta real de AWS o de un entorno desplegado.
@@ -16,9 +16,9 @@ Se actualizan con `node scripts/docs-check.mjs --metrics`. El script falla si es
 | Módulos | 5 |
 | Entornos | 2 |
 | Archivos .tf | 25 |
-| Variables de módulos | 26 |
-| Outputs de módulos | 13 |
-| Recursos declarados | 10 |
+| Variables de módulos | 27 |
+| Outputs de módulos | 15 |
+| Recursos declarados | 14 |
 | Claves de app_env_vars | 10 |
 
 ## Abiertos

@@ -4,8 +4,6 @@ Terraform infrastructure for the Sigmetum platform. Manages Elastic Beanstalk (N
 
 ## Architecture
 
-Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
-
 ```
 environments/
   dev/    — single EB instance (no ALB), CloudFront como terminador HTTPS, Amplify en feature/testing
@@ -28,10 +26,11 @@ modules/
 | Amplify branch | `feature/testing` | `master` |
 | Instance type | t3.nano | t3.nano (1–3) |
 | Load balancer | None (single instance) | ALB |
-| Backend HTTPS | CloudFront (`enable_cdn = true`) | ACM en ALB |
-| Assets HTTPS | CloudFront OAC | CloudFront OAC |
+| HTTPS | No (CloudFront proxy para dev, sin ACM) | Yes (ACM en ALB) |
 | DNS | — | `backend.sigmetum-a.org` |
 | Region | eu-west-3 | eu-west-3 |
+
+Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
 
 ## Prerequisites
 
