@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arquitectura Dev — SIGMETUM-A</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;600&family=Geist+Mono:wght@400&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f5f5f5; font-family: 'Geist', sans-serif; padding: 32px 24px; }
+  .eyebrow { font-family: 'Geist Mono', monospace; font-size: 10px; color: #7a8399;
+             letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 6px; }
+  h1 { font-family: 'Instrument Serif', serif; font-size: 24px; color: #2d3142; margin-bottom: 4px; }
+  .subtitle { font-size: 12px; color: #4f5d75; margin-bottom: 20px; }
+  .diagram-wrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<p class="eyebrow">SIGMETUM-A · INFRA · DEV</p>
+<h1>Arquitectura de desarrollo</h1>
+<p class="subtitle">Sin ALB · CloudFront como terminador HTTPS del backend · SingleInstance Beanstalk · eu-west-3</p>
+<div class="diagram-wrap">
+<svg viewBox="0 0 740 360" role="img" aria-labelledby="dev-title dev-desc"
+     style="display:block;min-width:740px;width:100%;max-width:740px;">
+  <title id="dev-title">Arquitectura Dev — SIGMETUM-A</title>
+  <desc id="dev-desc">El browser carga la SPA desde Amplify. Las llamadas API van de Amplify a CloudFront Backend (terminador HTTPS) y de ahí a Beanstalk por HTTP. Los assets estáticos van por CloudFront Assets con OAC a S3. Beanstalk accede a S3 por IAM.</desc>
+  <defs>
+    <marker id="d-arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#4f5d75"/>
+    </marker>
+    <marker id="d-arr-link" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#2e5aa8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="740" height="360" fill="#f5f5f5"/>
+
+  <!-- AWS zone -->
+  <rect x="316" y="24" width="408" height="256" rx="8"
+        fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <rect x="432" y="28" width="104" height="12" rx="2" fill="#f5f5f5"/>
+  <text x="484" y="37" fill="rgba(45,49,66,0.40)" font-size="7"
+        font-family="'Geist Mono',monospace" text-anchor="middle" letter-spacing="0.14em">AWS · EU-WEST-3</text>
+
+  <!-- ── ARROWS (before nodes) ── -->
+
+  <!-- 1: Browser → Amplify (HTTPS) -->
+  <line x1="116" y1="148" x2="152" y2="148"
+        fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#d-arr-link)"/>
+
+  <!-- 2: Amplify → CF-Backend (HTTPS API, exits upper right) -->
+  <path d="M 272,136 H 294 Q 302,136 302,128 V 88 Q 302,80 310,80 H 332"
+        fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#d-arr-link)"/>
+
+  <!-- 3: Amplify → CF-Assets (HTTPS assets, exits lower right) -->
+  <path d="M 272,160 H 294 Q 302,160 302,168 V 208 Q 302,216 310,216 H 332"
+        fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#d-arr-link)"/>
+
+  <!-- 4: CF-Backend → Beanstalk (HTTP proxy) -->
+  <line x1="488" y1="80" x2="524" y2="80"
+        fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#d-arr)"/>
+
+  <!-- 5: CF-Assets → S3 (OAC signed, HTTPS) -->
+  <line x1="488" y1="216" x2="524" y2="216"
+        fill="none" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#d-arr-link)"/>
+
+  <!-- 6: Beanstalk → S3 (IAM/SDK, dashed) -->
+  <line x1="608" y1="100" x2="608" y2="196"
+        fill="none" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,3"
+        marker-end="url(#d-arr)"/>
+
+  <!-- IAM label (beside dashed line, drawn before S3 node, no vertical overlap with S3) -->
+  <rect x="572" y="141" width="28" height="12" rx="2" fill="#f5f5f5"/>
+  <text x="586" y="150" fill="#4f5d75" font-size="7" font-family="'Geist Mono',monospace"
+        text-anchor="middle" letter-spacing="0.10em">IAM</text>
+
+  <!-- HTTP label on arrow 4 (above horizontal segment, 8px gap) -->
+  <rect x="496" y="64" width="32" height="12" rx="2" fill="#f5f5f5"/>
+  <text x="512" y="73" fill="#4f5d75" font-size="7" font-family="'Geist Mono',monospace"
+        text-anchor="middle" letter-spacing="0.10em">HTTP</text>
+
+  <!-- ── NODES ── -->
+
+  <!-- Browser (external) -->
+  <rect x="20" y="128" width="96" height="40" rx="6" fill="#f5f5f5"/>
+  <rect x="20" y="128" width="96" height="40" rx="6"
+        fill="#f5f5f5" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="68" y="144" fill="#2d3142" font-size="11" font-weight="600"
+        font-family="'Geist',sans-serif" text-anchor="middle">Browser</text>
+  <text x="68" y="158" fill="#7a8399" font-size="8"
+        font-family="'Geist Mono',monospace" text-anchor="middle">CLIENT</text>
+
+  <!-- Amplify (step) -->
+  <rect x="152" y="128" width="120" height="40" rx="6" fill="#f5f5f5"/>
+  <rect x="152" y="128" width="120" height="40" rx="6"
+        fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+  <text x="212" y="144" fill="#2d3142" font-size="11" font-weight="600"
+        font-family="'Geist',sans-serif" text-anchor="middle">Frontend</text>
+  <text x="212" y="158" fill="#7a8399" font-size="8"
+        font-family="'Geist Mono',monospace" text-anchor="middle">AMPLIFY HOSTING</text>
+
+  <!-- CF-Backend (focal / accent) -->
+  <rect x="332" y="60" width="156" height="40" rx="6" fill="#f5f5f5"/>
+  <rect x="332" y="60" width="156" height="40" rx="6"
+        fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.5"/>
+  <text x="410" y="76" fill="#2d3142" font-size="11" font-weight="600"
+        font-family="'Geist',sans-serif" text-anchor="middle">CF Backend</text>
+  <text x="410" y="90" fill="#7a8399" font-size="8"
+        font-family="'Geist Mono',monospace" text-anchor="middle">CLOUDFRONT · HTTPS → HTTP</text>
+
+  <!-- CF-Assets (step) -->
+  <rect x="332" y="196" width="156" height="40" rx="6" fill="#f5f5f5"/>
+  <rect x="332" y="196" width="156" height="40" rx="6"
+        fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+  <text x="410" y="212" fill="#2d3142" font-size="11" font-weight="600"
+        font-family="'Geist',sans-serif" text-anchor="middle">CF Assets</text>
+  <text x="410" y="226" fill="#7a8399" font-size="8"
+        font-family="'Geist Mono',monospace" text-anchor="middle">CLOUDFRONT · OAC</text>
+
+  <!-- Beanstalk (step) -->
+  <rect x="524" y="60" width="184" height="40" rx="6" fill="#f5f5f5"/>
+  <rect x="524" y="60" width="184" height="40" rx="6"
+        fill="#f5f5f5" stroke="#2d3142" stroke-width="1.2"/>
+  <text x="616" y="76" fill="#2d3142" font-size="11" font-weight="600"
+        font-family="'Geist',sans-serif" text-anchor="middle">Beanstalk Dev</text>
+  <text x="616" y="90" fill="#7a8399" font-size="8"
+        font-family="'Geist Mono',monospace" text-anchor="middle">t3.nano · SINGLE INSTANCE</text>
+
+  <!-- S3 (store) -->
+  <rect x="524" y="196" width="184" height="40" rx="6" fill="#f5f5f5"/>
+  <rect x="524" y="196" width="184" height="40" rx="6"
+        fill="#ececec" stroke="#2d3142" stroke-width="0.8"/>
+  <text x="616" y="212" fill="#2d3142" font-size="11" font-weight="600"
+        font-family="'Geist',sans-serif" text-anchor="middle">S3 Assets</text>
+  <text x="616" y="226" fill="#7a8399" font-size="8"
+        font-family="'Geist Mono',monospace" text-anchor="middle">sigmetum-app-assets-dev</text>
+
+  <!-- ── LEGEND ── -->
+  <rect x="0" y="296" width="740" height="64" fill="#ececec"/>
+  <line x1="0" y1="296" x2="740" y2="296" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+
+  <!-- Row 1 -->
+  <line x1="24" y1="318" x2="48" y2="318" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#d-arr-link)"/>
+  <text x="56" y="322" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">HTTPS</text>
+
+  <line x1="136" y1="318" x2="160" y2="318" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#d-arr)"/>
+  <text x="168" y="322" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">HTTP proxy</text>
+
+  <line x1="272" y1="318" x2="296" y2="318" stroke="#4f5d75" stroke-width="1"
+        stroke-dasharray="4,3" marker-end="url(#d-arr)"/>
+  <text x="304" y="322" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">IAM / SDK</text>
+
+  <rect x="408" y="310" width="28" height="16" rx="4"
+        fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+  <text x="444" y="322" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">terminador HTTPS (focal)</text>
+
+  <!-- Row 2 -->
+  <rect x="24" y="340" width="28" height="14" rx="4"
+        fill="#ececec" stroke="#2d3142" stroke-width="0.8"/>
+  <text x="60" y="351" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">almacén S3</text>
+
+  <rect x="152" y="340" width="28" height="14" rx="4"
+        fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8"/>
+  <text x="188" y="351" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">zona AWS</text>
+
+  <rect x="288" y="340" width="28" height="14" rx="4"
+        fill="#f5f5f5" stroke="#4f5d75" stroke-width="1" stroke-dasharray="4,2"/>
+  <text x="324" y="351" fill="#2d3142" font-size="9" font-family="'Geist',sans-serif">cliente externo</text>
+
+</svg>
+</div>
+</body>
+</html>
