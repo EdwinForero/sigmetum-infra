@@ -15,3 +15,8 @@ output "load_balancers" {
   description = "List of load balancer hostnames attached to the environment"
   value       = aws_elastic_beanstalk_environment.this.load_balancers
 }
+
+output "backend_cdn_url" {
+  description = "CloudFront HTTPS URL for the backend (dev only; empty when enable_cdn = false)"
+  value       = length(aws_cloudfront_distribution.backend) > 0 ? "https://${aws_cloudfront_distribution.backend[0].domain_name}" : ""
+}

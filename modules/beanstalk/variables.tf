@@ -2,6 +2,12 @@ variable "environment" {
   type = string
 }
 
+variable "enable_cdn" {
+  description = "Create a CloudFront distribution in front of Beanstalk (dev only — prod uses ALB with its own cert)"
+  type        = bool
+  default     = false
+}
+
 variable "solution_stack_name" {
   description = "EB platform. Use 'aws elasticbeanstalk list-available-solution-stacks' to find latest."
   type        = string

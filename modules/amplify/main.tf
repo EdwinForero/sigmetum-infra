@@ -30,9 +30,15 @@ resource "aws_amplify_app" "this" {
     NODE_ENV                 = var.environment
   }
 
-  # Pass static assets through; rewrite everything else to index.html for SPA routing
+  # Let hashed static assets pass through
   custom_rule {
-    source = "</^[^.]+$|(?<!\\.(css|gif|ico|jpg|js|json|png|svg|txt|webp|woff2?))$>"
+    source = "/assets/<*>"
+    status = "200"
+    target = "/assets/<*>"
+  }
+  # SPA catch-all: rewrite all other paths to index.html
+  custom_rule {
+    source = "</^((?!\\.).)+$>"
     status = "200"
     target = "/index.html"
   }

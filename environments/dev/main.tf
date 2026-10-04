@@ -13,6 +13,7 @@ module "beanstalk" {
 
   instance_type      = "t3.nano"
   load_balancer_type = "single"
+  enable_cdn         = true
   min_instances      = 1
   max_instances      = 1
 
@@ -33,6 +34,6 @@ module "amplify" {
   repository          = var.github_repository
   github_access_token = var.github_access_token
   branch              = "feature/testing"
-  backend_url         = "http://${module.beanstalk.endpoint_url}"
+  backend_url         = module.beanstalk.backend_cdn_url
   s3_url              = module.storage.cdn_url
 }
