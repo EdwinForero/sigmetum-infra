@@ -153,6 +153,20 @@ data "aws_iam_policy_document" "backend_ci" {
     ]
   }
 
+  # CloudFormation reads EB-managed templates from regional EB buckets (not only the account bucket)
+  statement {
+    sid    = "EBCFTemplateRead"
+    effect = "Allow"
+    actions = [
+      "s3:GetObject",
+      "s3:ListBucket",
+    ]
+    resources = [
+      "arn:aws:s3:::elasticbeanstalk-${var.aws_region}-*",
+      "arn:aws:s3:::elasticbeanstalk-${var.aws_region}-*/*",
+    ]
+  }
+
   # iam:PassRole — EB needs this to pass the EC2 instance profile role
   statement {
     sid     = "EBPassRole"
@@ -183,6 +197,7 @@ data "aws_iam_policy_document" "backend_ci" {
       "ec2:DescribeInstanceAttribute",
       "ec2:DescribeKeyPairs",
       "ec2:DescribeLaunchTemplates",
+      "ec2:DescribeLaunchTemplateVersions",
       "ec2:DescribeSecurityGroups",
       "ec2:DescribeSubnets",
       "ec2:DescribeVpcs",
