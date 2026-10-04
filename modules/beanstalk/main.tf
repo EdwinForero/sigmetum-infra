@@ -138,10 +138,19 @@ resource "aws_elastic_beanstalk_environment" "this" {
   }
 
   # ── Load balancer ──────────────────────────────────────────────────────────
+  # "single" maps to EnvironmentType=SingleInstance (no LB); AWS rejects "single" as a LoadBalancerType value
   setting {
     namespace = "aws:elasticbeanstalk:environment"
-    name      = "LoadBalancerType"
-    value     = var.load_balancer_type
+    name      = "EnvironmentType"
+    value     = var.load_balancer_type == "single" ? "SingleInstance" : "LoadBalanced"
+  }
+  dynamic "setting" {
+    for_each = var.load_balancer_type != "single" ? [var.load_balancer_type] : []
+    content {
+      namespace = "aws:elasticbeanstalk:environment"
+      name      = "LoadBalancerType"
+      value     = setting.value
+    }
   }
   setting {
     namespace = "aws:elasticbeanstalk:environment"
