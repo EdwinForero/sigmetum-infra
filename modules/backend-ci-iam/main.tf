@@ -66,6 +66,13 @@ data "aws_iam_policy_document" "backend_ci" {
       "s3:GetObjectAcl",
       "s3:PutObjectAcl",
       "s3:DeleteObject",
+      "s3:GetBucketPolicy",
+      "s3:GetBucketAcl",
+      "s3:GetBucketCORS",
+      "s3:GetBucketVersioning",
+      "s3:GetEncryptionConfiguration",
+      "s3:GetLifecycleConfiguration",
+      "s3:GetBucketObjectLockConfiguration",
     ]
     resources = [
       "arn:aws:s3:::${local.eb_bucket}",
@@ -137,10 +144,20 @@ data "aws_iam_policy_document" "backend_ci" {
     effect = "Allow"
     actions = [
       "autoscaling:DescribeAutoScalingGroups",
+      "autoscaling:DescribeScalingActivities",
+      "autoscaling:DescribeLaunchConfigurations",
+      "ec2:DescribeAccountAttributes",
       "ec2:DescribeImages",
+      "ec2:DescribeInstances",
+      "ec2:DescribeInstanceAttribute",
+      "ec2:DescribeKeyPairs",
+      "ec2:DescribeSecurityGroups",
       "ec2:DescribeSubnets",
       "ec2:DescribeVpcs",
+      "elasticbeanstalk:DescribeConfigurationOptions",
+      "elasticbeanstalk:DescribeConfigurationSettings",
       "elasticbeanstalk:DescribeEnvironments",
+      "elasticbeanstalk:DescribeEnvironmentResources",
       "elasticbeanstalk:DescribeEvents",
     ]
     resources = ["*"]
