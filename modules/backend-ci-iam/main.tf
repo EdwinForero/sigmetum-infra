@@ -93,6 +93,7 @@ data "aws_iam_policy_document" "backend_ci" {
     resources = [
       local.eb_app_arn,
       local.eb_env_arn,
+      "arn:aws:elasticbeanstalk:${var.aws_region}:${local.account_id}:applicationversion/sigmetum-backend-${var.environment}/*",
     ]
   }
 
