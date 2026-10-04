@@ -63,7 +63,7 @@ La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role`
 
 ## 6. Plataforma, tamaño de instancia y correo saliente
 
-- **Plataforma:** `64bit Amazon Linux 2023 v6.4.0 running Node.js 20` (`modules/beanstalk/variables.tf`, verificado). El `package.json` del backend no fija `engines.node` (verificado); coincide con la plataforma mientras no se cambie ninguno de los dos.
+- **Plataforma:** `64bit Amazon Linux 2023 v6.11.9 running Node.js 22` (`modules/beanstalk/variables.tf`, verificado). El `package.json` del backend no fija `engines.node` (verificado); compatible con Node.js 22 mientras no se fije una versión mayor en el `package.json`.
 - **Tamaño de instancia:** `t3.nano` en ambos entornos (verificado). El backend procesa ficheros Excel en memoria (`convertExcelToJson`, en `aws/awsS3connect.js` y otros); no hay una cifra de tamaño máximo de fichero ni una medición de uso de memoria con `t3.nano` (**por confirmar**; si los Excel crecen, puede haber que subir el tipo de instancia).
 - **Correo saliente:** el backend usa `nodemailer` contra `smtp.gmail.com` (`routes/content.js`, verificado) con `EMAIL`/`EMAIL_PASSWORD`. Sale por el puerto SMTP habitual (587/465); el grupo de seguridad de salida de Beanstalk no está restringido en este repositorio (egress por defecto), así que no debería bloquearlo (**por confirmar** en la cuenta real).
 - **Despliegue:** manual, subiendo un `.zip` del código por la consola o CLI de Beanstalk (README, verificado). No hay integración continua que empaquete y despliegue el backend.

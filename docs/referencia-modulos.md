@@ -32,7 +32,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | Variable | Tipo | Por defecto | Descripción |
 |---|---|---|---|
 | `environment` | string | — | `dev` o `prod`; forma los nombres `sigmetum-backend-<entorno>` |
-| `solution_stack_name` | string | plataforma Amazon Linux 2023 con Node.js 20 | Plataforma de Beanstalk; Terraform ignora sus cambios (`ignore_changes`) |
+| `solution_stack_name` | string | plataforma Amazon Linux 2023 con Node.js 22 | Plataforma de Beanstalk; Terraform ignora sus cambios (`ignore_changes`) |
 | `instance_type` | string | `t3.nano` | Tipo de instancia |
 | `min_instances` | number | `1` | Mínimo del grupo de autoescalado |
 | `max_instances` | number | `3` | Máximo del grupo de autoescalado |
