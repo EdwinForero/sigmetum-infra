@@ -59,4 +59,4 @@ Esto te permite en Cost Explorer agrupar por cuenta con un nombre legible en vez
 
 - Route53 no soporta tags en sus records — los costos de DNS aparecen sin tag de componente.
 - Los recursos de Beanstalk (instancias EC2, Auto Scaling) heredan los tags del environment.
-- El bucket de tfstate (`sigmetum-tfstate-preprod/prod`) no tiene tag `Component` — es infraestructura de Terraform, no de la app. Su costo es despreciable (pocos KB).
+- El bucket de tfstate (`sigmetum-state-dev` / `sigmetum-tfstate-prod`) no tiene tag `Component` — es infraestructura de Terraform, no de la app. Su costo es despreciable (pocos KB).
