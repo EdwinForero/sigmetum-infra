@@ -115,6 +115,7 @@ data "aws_iam_policy_document" "backend_ci" {
     effect = "Allow"
     actions = [
       "cloudformation:GetTemplate",
+      "cloudformation:UpdateStack",
       "cloudformation:DescribeStackResource",
       "cloudformation:DescribeStackResources",
       "cloudformation:DescribeStacks",
@@ -162,6 +163,7 @@ data "aws_iam_policy_document" "backend_ci" {
       "autoscaling:DescribeLaunchConfigurations",
       "ec2:DescribeAccountAttributes",
       "ec2:DescribeImages",
+      "ec2:DescribeLaunchTemplates",
       "ec2:DescribeInstances",
       "ec2:DescribeInstanceAttribute",
       "ec2:DescribeKeyPairs",
