@@ -159,11 +159,12 @@ data "aws_iam_policy_document" "backend_ci" {
     effect = "Allow"
     actions = [
       "s3:GetObject",
+      "s3:GetBucketLocation",
       "s3:ListBucket",
     ]
     resources = [
-      "arn:aws:s3:::elasticbeanstalk-${var.aws_region}-*",
-      "arn:aws:s3:::elasticbeanstalk-${var.aws_region}-*/*",
+      "arn:aws:s3:::elasticbeanstalk-*",
+      "arn:aws:s3:::elasticbeanstalk-*/*",
     ]
   }
 
