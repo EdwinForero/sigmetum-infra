@@ -3,15 +3,15 @@
 Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios). El backend no tiene un documento `para-infra.md` equivalente: su contrato con esta infraestructura es `config/validateEnv.js`, `index.js` y `aws/awsS3connect.js`, que se citan aquí.
 
 - Lo verificado contra el código de Terraform y del backend está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 30/09/2026. Infraestructura: rama `feature/testing` (cambios sin confirmar). Backend: commit `ace5367`.
+- Fecha de la verificación: 30/09/2026 (actualizado 04/10/2026). Infraestructura: rama `feature/testing`, commit `f35dd3a`. Backend: rama `feature/sigmetum_v2`.
 
 ## 1. Resumen
 
 | Id | Problema | Efecto | Estado |
 |---|---|---|---|
-| **infra:C5** | `app_env_vars` no incluía `ALLOWED_ORIGIN`, `ADMIN_USERNAME` ni `ADMIN_PASSWORD` en el `terraform.tfvars` de dev (obligatorias en `validateEnv.js`) | El backend no arranca | **Parcialmente resuelto** — las plantillas `.example` y la referencia ya las incluyen; los `terraform.tfvars` reales (fuera de git) deben actualizarse por quien despliega |
-| **infra:C6** | `HealthCheckPath` de Beanstalk es `/`; el backend responde en `/healthcheck` | El entorno puede figurar como no saludable | **Resuelto** (rama `feature/testing` de infra) |
-| **backend:B1** | `index.js` no configura `trust proxy`; el límite de intentos de login es por IP | Detrás del ALB, todos los usuarios pueden compartir la misma IP vista por `express-rate-limit` | Abierto (por confirmar el efecto real) |
+| ~~**infra:C5**~~ | ~~`app_env_vars` no incluía `ALLOWED_ORIGIN`, `ADMIN_USERNAME` ni `ADMIN_PASSWORD`~~ | ~~El backend no arranca~~ | **Resuelto** — plantillas `.example` y referencia incluyen todas las obligatorias **(verificado)** |
+| ~~**infra:C6**~~ | ~~`HealthCheckPath` de Beanstalk es `/`~~ | ~~El entorno puede figurar como no saludable~~ | **Resuelto** (`feature/testing` de infra): `HealthCheckPath = "/healthcheck"` **(verificado)** |
+| ~~**backend:B1**~~ | ~~`index.js` no configura `trust proxy`~~ | ~~IP del balanceador compartida por todos los usuarios en el rate-limiter~~ | **Resuelto (03/10/2026)**: `app.set('trust proxy', 1)` en `index.js` |
 
 ## 2. Contrato de entorno: `app_env_vars` frente a `validateEnv.js`
 
@@ -44,14 +44,14 @@ Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las clav
 
 | Entorno | HTTPS | Balanceador | DNS |
 |---|---|---|---|
-| `dev` | No (instancia única) | Ninguno | Ninguno |
+| `dev` | Sí — CloudFront termina HTTPS delante de Beanstalk (`enable_cdn = true`) **(verificado)** | CloudFront → Beanstalk single (sin ALB) | Ninguno (dominio de CloudFront) |
 | `prod` | Sí, si `ssl_certificate_arn` está definido | ALB (autoescalado 1–3) | `backend.sigmetum-a.org` (CNAME al endpoint de Beanstalk, `modules/dns`) |
 
 **(verificado en `environments/*/main.tf` y `modules/dns/main.tf`).**
 
 ### Cabeceras `X-Forwarded-*` y `trust proxy`
 
-El ALB de prod añade `X-Forwarded-For` y `X-Forwarded-Proto` a las peticiones (comportamiento estándar de un ALB de AWS, **por confirmar** en este despliegue). El backend no llama a `app.set('trust proxy', ...)` en `index.js` (verificado): sin eso, Express (y el limitador de `express-rate-limit` en `routes/auth.js`) ve la IP del balanceador, no la del cliente, y el límite de intentos de login se aplicaría a todos los usuarios juntos (backend:B1). Es una decisión del código del backend; infra solo puede confirmar que el ALB reenvía esas cabeceras.
+El ALB de prod (y CloudFront en dev) añaden `X-Forwarded-For` y `X-Forwarded-Proto` a las peticiones. El backend configura `app.set('trust proxy', 1)` en `index.js` **(B1 resuelto, 03/10/2026)**: Express y el limitador de `express-rate-limit` leen la IP real del cliente.
 
 ## 5. Permisos IAM de S3
 
@@ -66,7 +66,7 @@ La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role`
 - **Plataforma:** `64bit Amazon Linux 2023 v6.11.9 running Node.js 22` (`modules/beanstalk/variables.tf`, verificado). El `package.json` del backend no fija `engines.node` (verificado); compatible con Node.js 22 mientras no se fije una versión mayor en el `package.json`.
 - **Tamaño de instancia:** `t3.nano` en ambos entornos (verificado). El backend procesa ficheros Excel en memoria (`convertExcelToJson`, en `aws/awsS3connect.js` y otros); no hay una cifra de tamaño máximo de fichero ni una medición de uso de memoria con `t3.nano` (**por confirmar**; si los Excel crecen, puede haber que subir el tipo de instancia).
 - **Correo saliente:** el backend usa `nodemailer` contra `smtp.gmail.com` (`routes/content.js`, verificado) con `EMAIL`/`EMAIL_PASSWORD`. Sale por el puerto SMTP habitual (587/465); el grupo de seguridad de salida de Beanstalk no está restringido en este repositorio (egress por defecto), así que no debería bloquearlo (**por confirmar** en la cuenta real).
-- **Despliegue:** manual, subiendo un `.zip` del código por la consola o CLI de Beanstalk (README, verificado). No hay integración continua que empaquete y despliegue el backend.
+- **Despliegue:** GitHub Actions con OIDC (módulo `backend-ci-iam`). Push a `feature/testing` → dev; push a `master` → prod. Solo despliega si el job `verify` (lint, quality, docs:check) pasa. Ver sección 9.
 
 ## 7. `ALLOWED_ORIGIN` por entorno
 
@@ -140,7 +140,7 @@ El bucket de staging lo deriva el workflow del account ID al correr (`elasticbea
 | El tipo de instancia | Sección 6 | PR: motivo (coste o capacidad) |
 | `modules/backend-ci-iam` (rol, bucket, permisos) | Sección 9 | PR: qué cambió y si hay que actualizar variables en GitHub |
 
-## 10. Mantener este documento
+## 11. Mantener este documento
 
 - Se actualiza cuando cambia `app_env_vars`, el health check, el ALB, el DNS o la política IAM de S3.
 - Se contrasta con `config/validateEnv.js`, `index.js` y `aws/awsS3connect.js` del backend antes de afirmar algo sobre su código.
