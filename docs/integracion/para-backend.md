@@ -87,7 +87,7 @@ Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN`
 
 | Id | Qué pasa | Dónde | Responsable | Qué hacer |
 |---|---|---|---|---|
-| **B1** | Sin `trust proxy`, el límite de intentos de login puede agruparse por la IP del balanceador | `../sigmetum-backend/index.js` | backend | Confirmar el efecto real tras el ALB y, si aplica, añadir `app.set('trust proxy', 1)` |
+| **B1** | ~~Sin `trust proxy`, el límite de intentos de login puede agruparse por la IP del balanceador~~ | `../sigmetum-backend/index.js` | backend | **Resuelto (04/10/2026):** `app.set('trust proxy', 1)` añadido en commit `7748a1c` |
 | **B2** | La política IAM de S3 da escritura y borrado sobre todo el bucket, más permiso del que usa el código | `modules/storage/main.tf` | infra | Limitar a los prefijos de `config/s3Paths.js` (también registrado como [S7](../estado-y-deuda-tecnica.md#abiertos)) |
 | **B3** | ~~`package.json` del backend no fija `engines.node`~~  | `../sigmetum-backend/package.json` | backend | **Resuelto (03/10/2026):** `"engines": { "node": "22.x" }` añadido |
 
@@ -106,11 +106,29 @@ Push a `feature/testing` → despliega en `sigmetum-backend-dev-env`. Push a `ma
 | `S3_BUCKET_DEV` | `sigmetum-backend-deploys-dev` |
 | `S3_BUCKET_PROD` | `sigmetum-backend-deploys-prod` |
 
-**Puesta en marcha:**
-1. `terraform apply` en `environments/dev/` → crea OIDC provider, rol y bucket en la cuenta dev.
-2. `terraform apply` en `environments/prod/` → ídem en la cuenta prod.
-3. Copiar los ARN de `ci_role_arn` a las variables de GitHub Actions.
-4. Hacer push a cada rama para verificar el pipeline.
+**Puesta en marcha (paso a paso):**
+
+1. Setear el profile de la cuenta dev y aplicar:
+   ```powershell
+   $env:AWS_PROFILE = "sigmetum-preprod"
+   cd environments/dev
+   terraform init
+   terraform apply
+   ```
+2. Copiar el output `ci_role_arn` del apply (ARN del rol IAM).
+
+3. En el repo `sigmetum-backend` → **Settings → Secrets and variables → Actions → Variables** → crear:
+
+   | Variable | Valor |
+   |----------|-------|
+   | `AWS_ROLE_DEV` | ARN del output `ci_role_arn` (cuenta dev) |
+   | `S3_BUCKET_DEV` | `sigmetum-backend-deploys-dev` |
+
+4. Repetir los pasos 1–3 para prod (`sigmetum-prod`, entorno `environments/prod/`, variables `AWS_ROLE_PROD` y `S3_BUCKET_PROD`).
+
+5. Push a `feature/testing` → verificar en GitHub Actions que el job `deploy` pasa.
+   - El job `deploy` **no corre en PRs**, solo en push directo a la rama.
+   - Si falla por variables no configuradas: re-run desde la pestaña Actions tras crearlas.
 
 ## 10. Si cambias algo (en `sigmetum-infra`)
 
