@@ -6,7 +6,7 @@
 notification_email = "tu@email.com"
 
 # Nombre del bucket S3 de datos. Debe ser único globalmente en AWS.
-bucket_name = "sigmetum-app-dev"
+bucket_name = "sigmetum-app-assets-dev"
 
 # URL del repositorio de GitHub del frontend que Amplify clonará.
 github_repository = "https://github.com/TU_ORG/sigmetum-frontend"
@@ -24,7 +24,7 @@ app_env_vars = {
   AWS_REGION = "eu-west-3"
 
   # Nombre del bucket S3 — debe coincidir con bucket_name de arriba.
-  AWS_BUCKET_NAME = "sigmetum-app-dev"
+  AWS_BUCKET_NAME = "sigmetum-app-assets-dev"
 
   # Clave secreta para firmar los JWT. Genera con: openssl rand -hex 32
   # Usa un valor distinto en prod.

@@ -21,7 +21,7 @@ modules/
 |---|---|---|
 | Beanstalk app | `sigmetum-backend-dev` | `sigmetum-backend-prod` |
 | Beanstalk env | `sigmetum-backend-dev-env` | `sigmetum-backend-prod-env` |
-| S3 bucket | `sigmetum-app-dev` | `sigmetum-app-prod` |
+| S3 bucket | `sigmetum-app-assets-dev` | `sigmetum-app-assets-prod` |
 | Amplify app | `sigmetum-frontend-dev` | `sigmetum-frontend-prod` |
 | Amplify branch | `feature/testing` | `master` |
 | Instance type | t3.nano | t3.nano (1–3) |
@@ -115,7 +115,7 @@ terraform destroy
 ```
 
 > The S3 bucket for app assets will fail to destroy if it contains objects. Empty it first:
-> `aws s3 rm s3://sigmetum-app-dev --recursive`
+> `aws s3 rm s3://sigmetum-app-assets-dev --recursive`
 
 ## Cost tracking
 
