@@ -11,7 +11,7 @@ bucket_name = "sigmetum-app-assets-prod"
 # URL del repositorio de GitHub del frontend que Amplify clonará.
 github_repository = "https://github.com/EdwinForero/sigmetum-frontend"
 
-# Token clásico de GitHub con scope "repo".
+# Token clásico de GitHub con scopes "repo" y "admin:repo_hook".
 # Genera uno en: GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
 # Rótalo periódicamente (hallazgo S10). Usa el mismo valor en dev y prod.
 github_access_token = "ghp_CHANGE_ME"
