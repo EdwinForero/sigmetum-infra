@@ -64,6 +64,7 @@ data "aws_iam_policy_document" "backend_ci" {
       "s3:ListBucket",
       "s3:GetBucketLocation",
       "s3:GetObjectAcl",
+      "s3:PutObjectAcl",
     ]
     resources = [
       "arn:aws:s3:::${local.eb_bucket}",
@@ -121,6 +122,7 @@ data "aws_iam_policy_document" "backend_ci" {
     effect = "Allow"
     actions = [
       "sns:CreateTopic",
+      "sns:GetTopicAttributes",
       "sns:ListSubscriptionsByTopic",
     ]
     resources = [
