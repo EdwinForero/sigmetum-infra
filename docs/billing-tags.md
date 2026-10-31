@@ -55,6 +55,18 @@ Además de los tags en recursos, las cuentas en AWS Organizations tienen sus pro
 
 Esto te permite en Cost Explorer agrupar por cuenta con un nombre legible en vez de solo el Account ID.
 
+## Configuración de billing completada (2026-10-04)
+
+| Ítem | Estado | Detalle |
+|---|---|---|
+| Presupuesto mensual | ✅ Activo | `sigmetum-budget` — $50/mes, alerta al 80% |
+| Divisa de facturación | ✅ Configurada | EUR — Amazon Web Services EMEA SARL |
+| Cost allocation tags | ⏳ Pendiente | Activar después del primer `terraform apply` |
+| Detección de anomalías | ⏳ Pendiente | Crear monitor en Billing → Detección de anomalías |
+| Free Tier alerts | ⏳ Pendiente | Activar en Billing → Preferencias de facturación |
+
+---
+
 ## Notas
 
 - Route53 no soporta tags en sus records — los costos de DNS aparecen sin tag de componente.

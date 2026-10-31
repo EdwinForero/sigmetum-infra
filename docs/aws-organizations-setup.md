@@ -8,7 +8,38 @@ cuenta management (502768731030)   ← desde aquí corres Terraform
     └── sigmetum-prod               ← environments/prod
 ```
 
-> **Región en la consola:** verifica siempre que esté en `eu-west-1` (Ireland) antes de hacer cualquier cosa.
+> **Región en la consola:** verifica siempre que esté en `eu-west-3` (París) antes de hacer cualquier cosa.
+
+---
+
+## 0. Crear la cuenta raíz y configurar MFA
+
+Este paso lo hace el **owner** (la persona que paga la factura de AWS). Solo se hace una vez.
+
+### Crear la cuenta
+
+1. Ve a [aws.amazon.com](https://aws.amazon.com) → **Create an AWS Account**
+2. Usa el email del owner — documenta en un gestor de contraseñas que ese email es la cuenta raíz de AWS
+3. Completa los datos de facturación (tarjeta del pagador)
+4. Elige el plan **Basic (gratuito)** — se puede subir a Business/Enterprise si se necesita soporte de AWS
+
+### Configurar MFA en la cuenta raíz
+
+1. Inicia sesión como root
+2. Menú de usuario (arriba a la derecha) → **Security credentials** (no entres a IAM)
+3. Sección **Multi-factor authentication (MFA)** → **Assign MFA device**
+4. Elige **Authenticator app** (TOTP) — recomendado: Authy o 1Password
+5. Escanea el QR y confirma con dos códigos consecutivos
+
+> **La cuenta raíz nunca se usa para el día a día.** Solo sirve para cambiar la facturación, cerrar la cuenta o recuperar acceso de emergencia. Todo el trabajo operativo se hace con el usuario IAM Identity Center del paso 2.
+
+### Activar la alerta de facturación
+
+Hazlo inmediatamente después de crear la cuenta para detectar gastos inesperados:
+
+1. Busca **Billing** en la consola → **Budgets** → **Create budget**
+2. Tipo: **Cost budget** → presupuesto mensual de referencia (por ejemplo $50)
+3. Añade una alerta al 80 % con notificación por email al owner
 
 ---
 
@@ -57,8 +88,8 @@ Hazlo dos veces con estos datos:
 
 | Cuenta | Account ID |
 |---|---|
-| sigmetum-preprod | `798092528785` |
-| sigmetum-prod | *(anotar aquí)* |
+| sigmetum-preprod | `698815298450` |
+| sigmetum-prod | `480836974880` |
 
 ---
 
@@ -113,7 +144,7 @@ La forma más fácil es acceder a cada cuenta desde la consola y dejar que el wi
 
 1. En **AWS Organizations** → **AWS accounts** → clic en `sigmetum-preprod`
 2. Clic en **Access with role: OrganizationAccountAccessRole** — esto te lleva a la consola de esa cuenta
-3. Verifica que la región sea `eu-west-1`
+3. Verifica que la región sea `eu-west-3`
 4. Ve a **Elastic Beanstalk** → **Create application** → sigue el wizard hasta ver los roles creados → **Cancel**
 5. Repite para `sigmetum-prod`
 

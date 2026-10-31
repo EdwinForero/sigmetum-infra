@@ -1,6 +1,6 @@
 # AWS CLI Setup
 
-> **Región en la consola:** verifica siempre que esté en `eu-west-1` (Ireland) antes de hacer cualquier cosa en AWS Console.
+> **Región en la consola:** verifica siempre que esté en `eu-west-3` (París) antes de hacer cualquier cosa en AWS Console.
 
 ---
 
@@ -23,13 +23,13 @@
 IAM Identity Center permite hacer login por navegador — sin access keys estáticas.
 Hacerlo una vez desde la cuenta management (502768731030).
 
-> **Región:** IAM Identity Center es regional. Actívalo en `eu-west-1` (Ireland).
+> **Región:** IAM Identity Center es regional. Actívalo en `eu-west-3` (París) — misma región que los recursos.
 
 1. Busca **IAM Identity Center** en la consola
 2. Clic en **Enable** → selecciona **Enable with AWS Organizations**
 3. Una vez activado, ve a **Settings** → sección **Identity source** y copia la **AWS access portal URL**
-   - Instance URL: `https://identitycenter.amazonaws.com/ssoins-6804aea6a287996d`
-   - Access portal URL: la encuentras en Settings, formato `https://d-93679a5478.awsapps.com/start` — **esta es la que usa el CLI**
+   - Instance URL: `https://identitycenter.amazonaws.com/ssoins-6656fab2a5f5ce78`
+   - Access portal URL: la encuentras en Settings, formato `https://ssoins-6656fab2a5f5ce78.portal.eu-west-3.amazonaws.com/start` — **esta es la que usa el CLI**
 4. En **Settings** → sección **Authentication** → activa **Send email OTP for users created from API**
 
 ---
@@ -75,17 +75,17 @@ aws configure sso
 **Primera vez — perfil preprod:**
 ```
 SSO session name:          sigmetum
-SSO start URL:             https://d-93679a5478.awsapps.com/start
-SSO region:                eu-west-1
+SSO start URL:             https://ssoins-6656fab2a5f5ce78.portal.eu-west-3.amazonaws.com/start
+SSO region:                eu-west-3
 SSO registration scopes:   sso:account:access
 ```
 
 Se abrirá el navegador → aprueba el acceso. Luego el CLI lista las cuentas disponibles y pide los valores del perfil:
 
 ```
-Account: 798092528785 (sigmetum-preprod)
+Account: 698815298450 (sigmetum-preprod)
 Role:    AdministratorAccess
-CLI default client Region [None]: eu-west-1
+CLI default client Region [None]: eu-west-3
 CLI default output format [None]: json
 CLI profile name [...]:           sigmetum-preprod
 ```
@@ -96,14 +96,14 @@ aws configure sso
 ```
 ```
 SSO session name:          sigmetum          ← misma sesión, no la recrea
-SSO start URL:             https://d-93679a5478.awsapps.com/start
-SSO region:                eu-west-1
+SSO start URL:             https://ssoins-6656fab2a5f5ce78.portal.eu-west-3.amazonaws.com/start
+SSO region:                eu-west-3
 SSO registration scopes:   sso:account:access
 ```
 ```
-Account: ID-PROD (sigmetum-prod)
+Account: 480836974880 (sigmetum-prod)
 Role:    AdministratorAccess
-CLI default client Region [None]: eu-west-1
+CLI default client Region [None]: eu-west-3
 CLI default output format [None]: json
 CLI profile name [...]:           sigmetum-prod
 ```
@@ -113,19 +113,19 @@ El resultado en `~/.aws/config` queda así:
 ```ini
 [profile sigmetum-preprod]
 sso_session = sigmetum
-sso_account_id = 798092528785
+sso_account_id = 698815298450
 sso_role_name = AdministratorAccess
-region = eu-west-1
+region = eu-west-3
 
 [profile sigmetum-prod]
 sso_session = sigmetum
-sso_account_id = ID-PROD
+sso_account_id = 480836974880
 sso_role_name = AdministratorAccess
-region = eu-west-1
+region = eu-west-3
 
 [sso-session sigmetum]
-sso_start_url = https://d-93679a5478.awsapps.com/start
-sso_region = eu-west-1
+sso_start_url = https://ssoins-6656fab2a5f5ce78.portal.eu-west-3.amazonaws.com/start
+sso_region = eu-west-3
 sso_registration_scopes = sso:account:access
 ```
 
