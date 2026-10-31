@@ -42,5 +42,17 @@
       "PowerShell(aws *)"
     ]
   },
-  "autoMemoryEnabled": false
+  "autoMemoryEnabled": false,
+  "enabledPlugins": {
+    "backend-general@locales": false,
+    "dominio-api-express@locales": false,
+    "dominio-aws-s3@locales": false,
+    "dominio-frontend@locales-front": false,
+    "ciclo-agentico@locales": false,
+    "ciclo-agentico@locales-front": false,
+    "ciclo-agentico@locales-infra": true,
+    "frontend-design@claude-plugins-official": false,
+    "ui-ux-pro-max@ui-ux-pro-max-skill": false,
+    "impeccable@impeccable": false
+  }
 }

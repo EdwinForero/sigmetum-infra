@@ -28,7 +28,7 @@
   "specsDir": "docs/specs",
   "maxVueltas": 3,
   "consultor": "ninguno",
-  "estilo": "ninguno",
+  "estilo": "i-have-adhd",
   "perfiles": [
     "base",
     "terraform",
@@ -42,7 +42,7 @@
     "bucket de datos (versionado, bloqueo, prevent_destroy)",
     "contrato con el frontend y el backend (VITE_*, build_spec, app_env_vars)",
     "CI",
-    "cualquier cambio que implique un apply"
+    "destrucción o reemplazo de recursos (prevent_destroy, cambios que fuerzan recreación)"
   ],
   "docsObligatorios": [
     "docs/estado-y-deuda-tecnica.md"
