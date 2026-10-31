@@ -54,4 +54,9 @@ module "amplify" {
   branch              = "master"
   backend_url         = "https://backend.sigmetum-a.org"
   s3_url              = module.storage.cdn_url
+
+  # Apex and www serve the same app from master; both must be in ALLOWED_ORIGIN (deploy the backend first)
+  custom_domains = {
+    "sigmetum-a.org" = ["", "www"]
+  }
 }

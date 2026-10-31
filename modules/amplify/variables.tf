@@ -40,3 +40,14 @@ variable "carousel_image_keys" {
   type        = string
   default     = ""
 }
+
+variable "custom_domains" {
+  description = "Custom domains for the deployed branch: root domain name => subdomain prefixes (\"\" is the apex, \"www\" is www.<root>). Empty creates no domain association."
+  type        = map(list(string))
+  default     = {}
+
+  validation {
+    condition     = alltrue([for domain in keys(var.custom_domains) : can(regex("^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$", domain))])
+    error_message = "custom_domains keys must be bare lower-case domain names (no scheme, path or port), for example example.org."
+  }
+}

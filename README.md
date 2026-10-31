@@ -29,6 +29,7 @@ modules/
 | Load balancer | None (single instance) | ALB |
 | HTTPS | No (CloudFront proxy para dev, sin ACM) | Yes (ACM en ALB) |
 | DNS | — | `backend.sigmetum-a.org` |
+| Frontend domain | — (Amplify default domain) | `sigmetum-a.org` and `www.sigmetum-a.org` (association and Route53 records created by the Amplify module, not by `modules/dns`) |
 | CI artifacts bucket | `sigmetum-backend-deploys-dev` | `sigmetum-backend-deploys-prod` |
 | HTTP to HTTPS redirect (80 to 443) | — | Yes (listener rule, 301; only with ALB and certificate) |
 | Region | eu-west-3 | eu-west-3 |
@@ -112,6 +113,8 @@ Beanstalk deploys automatically when you push a new application bundle. Upload a
 
 Amplify auto-builds on every push to the configured branch (`feature/testing` for preprod, `master` for prod). The build pins Node 22 with `nvm` and runs `npm test` in `preBuild`: if the tests fail, Amplify does not deploy.
 
+Dev and prod differ on purpose in two Amplify settings: `custom_domains` is empty in dev (no domain association and no Route53 records; the app is served from the Amplify default domain) and set in prod (apex and `www`, same app, no redirect between them). Both environments send the same cache and security headers (HSTS of one day, CSP in report-only mode). Prod deploy order and checks: [docs/integracion/para-frontend.md](docs/integracion/para-frontend.md#4-orden-de-despliegue).
+
 ### Destroy an environment
 
 ```bash
@@ -150,6 +153,8 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [docs/guias/buenas-practicas-terraform.md](docs/guias/buenas-practicas-terraform.md) | Terraform rules: structure, variables, versions, state, tags, change flow (read it before touching any `.tf`) |
 | [docs/guias/seguridad.md](docs/guias/seguridad.md) | Infrastructure security rules and current status (read it before touching IAM, S3, secrets, network, TLS or Amplify) |
 | [docs/referencia-modulos.md](docs/referencia-modulos.md) | Variables and outputs of each module and environment, and the `app_env_vars` keys |
+| [Spec](docs/specs/2026-10-31-dominio-cabeceras-assets-design.md), [plan](docs/specs/2026-10-31-dominio-cabeceras-assets-plan.md) and [PR notice](docs/specs/2026-10-31-dominio-cabeceras-assets-aviso-pr.md) | Prod frontend domain, Amplify cache and security headers and assets upload script (31/10/2026): C9, C11 and C7 resolved in code |
+| [scripts/sync-assets.mjs](scripts/sync-assets.mjs) | Uploads the contents of `assets/` to the environment bucket with `aws s3 sync` (`--dryrun` first; never deletes). Optional test: `node --test scripts/sync-assets.test.mjs` |
 | [scripts/quality-check.mjs](scripts/quality-check.mjs) | Quality and security gate: `node scripts/quality-check.mjs` (run it together with `node scripts/docs-check.mjs`) |
 | [docs/estado-y-deuda-tecnica.md](docs/estado-y-deuda-tecnica.md) | Metrics, open findings and technical debt |
 | [docs/terraform-setup.md](docs/terraform-setup.md) | Install Terraform and first use |

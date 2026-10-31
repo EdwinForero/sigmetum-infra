@@ -46,9 +46,9 @@ app_env_vars = {
   # (npm install -g bcryptjs si no lo tienes)
   ADMIN_PASSWORD = "CHANGE_ME_bcrypt_hash"
 
-  # Origen exacto del frontend de prod, sin barra final. Usado para CORS.
-  # Será el dominio propio cuando esté configurado (hallazgo C9),
-  # o la URL de Amplify: https://master.<id>.amplifyapp.com
+  # Formato: dos orígenes https separados por coma, sin barra final ni espacios obligatorios:
+  # https://<dominio>,https://www.<dominio>
+  # El backend compara cada origen de forma exacta.
   ALLOWED_ORIGIN = "https://CHANGE_ME_frontend_origin"
 
   # Cuenta de correo desde la que el backend envía emails.

@@ -37,6 +37,7 @@ Este documento dice **qué hay que revisar y actualizar después de cada cambio 
 | **Documentos** nuevos, renombrados o movidos | Tabla "Documentation" del README | `docs-check` valida los enlaces y que todo `docs/*.md` esté enlazado |
 | **`.claude/**`** (`flujo.json`, `settings.json`) o **`plugins/**`** (ciclo agéntico y skills locales) | [plugins/README.md](../../plugins/README.md) (única lista de plugins y skills) y la sección "Ciclo de desarrollo" de [CLAUDE.md](../../CLAUDE.md); [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) (iteración fechada) | `node plugins/ciclo-agentico/scripts/docs-gate.mjs --solo-validar` y `node --test "plugins/**/tests/**/*.test.mjs"`; `settings.json` conserva todas las reglas `deny` y su `enabledPlugins` desactiva los plugins de otros repositorios; tras cambiar un plugin local, "Tras cambiar un plugin local" de `plugins/README.md` |
 | Los **scripts** `scripts/docs-check.mjs` o `scripts/quality-check.mjs` | Sección 4 de este documento | Que sigue detectando deriva (provocar un fallo y revertirlo) |
+| Un **script nuevo** en `scripts/` | Fila en la tabla "Documentation" del README, esta sección 2 y la sección 4 (qué hace, cómo se prueba y si exige entrada en `quality-check`, `docs-check` o `docsPorArea`); `scripts/**` ya pide este documento | Que pasa `quality-check` (sin ARN ni números de 12 dígitos); su prueba, si la tiene (`node --test scripts/<nombre>.test.mjs`); un script que llame a AWS nunca lo ejecuta un rol del ciclo |
 
 ## 3. Contrato con el frontend y el backend (convención entre repositorios)
 
@@ -157,6 +158,14 @@ Puerta de calidad y seguridad ([scripts/quality-check.mjs](../../scripts/quality
 **Excepciones aceptadas por escrito:** viven en la constante `KNOWN_DEBT` del script, cada una con el id de su hallazgo en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md). Al resolver un hallazgo, se quita de la constante y se pasa a "Resueltos". Una excepción nueva sin hallazgo registrado no es aceptable. Las recomendaciones de instalar `tflint`, `trivy` y `checkov` son opcionales (**por confirmar** si el equipo los adopta).
 
 Además, `docs-check` exige que cada guía de `docs/guias/` figure en la tabla "Documentation" del README y en [CLAUDE.md](../../CLAUDE.md).
+
+### Otros scripts de `scripts/`
+
+| Script | Qué hace | Prueba (opcional) |
+|---|---|---|
+| [scripts/sync-assets.mjs](../../scripts/sync-assets.mjs) | Sube el **contenido** de una carpeta local de `assets/` a `s3://<bucket>/assets/` con `aws s3 sync` (infra:C7). Obligatorios `--source`, `--bucket` y `--profile`; `--dryrun` simula; nunca usa `--delete`; sin valores por defecto ni credenciales. La subida real la hace una persona, antes con `--dryrun`; ningún rol del ciclo lo ejecuta contra AWS. Procedimiento en [para-frontend.md](../integracion/para-frontend.md#procedimiento-de-subida-infrac7) | `node --test scripts/sync-assets.test.mjs` (sin AWS: el `run` está simulado). No lo recoge el comando de pruebas de `plugins/` ni la CI, a propósito, para no tocar los tres sitios de la definición de terminado |
+
+No exige entrada nueva en `quality-check`, `docs-check` ni `docsPorArea` de `.claude/flujo.json` (`scripts/**` ya pide este documento y ambos scripts ya escanean `scripts/`).
 
 ### Formato y validación de Terraform (sin `apply`)
 

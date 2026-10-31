@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios). El backend no tiene un documento `para-infra.md` equivalente: su contrato con esta infraestructura es `config/validateEnv.js`, `config/trustProxy.js`, `app.js` y `aws/awsS3connect.js`, que se citan aquí.
 
 - Lo verificado contra el código de Terraform y del backend está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 30/09/2026 (actualizado 30/10/2026, seguridad del bucket). Infraestructura: rama `feature/testing`, commit base `d3866f5` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `ea19315`.
+- Fecha de la verificación: 30/09/2026 (actualizado 31/10/2026, `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `9128987` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
 
 ## 1. Resumen
 
@@ -125,9 +125,9 @@ ALLOWED_ORIGIN = "https://feature-testing.d37662kpg8985h.amplifyapp.com,https://
 | Entorno | Qué poner en `ALLOWED_ORIGIN` | Estado |
 |---|---|---|
 | `dev` | URL(s) de las ramas activas en Amplify, separadas por coma | Por fijar — añadir la URL de cada rama que necesite acceder al API |
-| `prod` | El dominio del frontend en `prod`, que hoy no existe (infra:C9) | Por fijar tras crear el dominio |
+| `prod` | Los dos orígenes del frontend, con el formato `https://<dominio>,https://www.<dominio>` (solo marcadores aquí; el dominio es el de la zona de `prod`, infra:C9). Sin barra final, y la comparación es exacta y sensible a mayúsculas (`includes` sobre cada origen tras `trim`; `validateEnv.js` solo exige que la variable exista, **verificado** en `app.js` y `config/validateEnv.js` del backend) | **Por fijar por una persona** en el `terraform.tfvars` de `prod` y aplicar el backend **antes** de que el frontend sirva desde el dominio nuevo |
 
-Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN` depende de una URL que solo se conoce después de desplegar Amplify.
+**Dependencia de orden (infra:C9):** el dominio de `prod` lo crea `modules/amplify` en el `apply` de `prod`; el backend debe aceptar los dos orígenes antes, o el frontend recibiría 403 por CORS. El dominio por defecto de Amplify (`*.amplifyapp.com`) de `prod` no estará en la lista y el backend le dará 403 por CORS. Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue) (punto 5) para el orden completo. En `dev`, `ALLOWED_ORIGIN` sigue dependiendo de una URL que solo se conoce después de desplegar Amplify.
 
 ## 8. Discrepancias
 

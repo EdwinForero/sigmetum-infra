@@ -77,14 +77,14 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 - **Por qué:** sin HTTPS, contraseñas y token viajan en claro, y el navegador bloquea el contenido mixto.
 - **Regla:** HTTPS obligatorio en todo entorno que se use; el ALB con una política TLS moderna; el certificado en la misma región que el proveedor; el puerto 80 solo redirige a HTTPS.
 - **Cómo:** `docs-check` avisa de `backend_url` con `http://` y comprueba la región del ARN de ACM en la plantilla.
-- **Estado:** prod: listener 443 con la política `ELBSecurityPolicy-TLS13-1-2-2021-06` (verificado). Redirección 301 de 80 a 443 en el listener 80 solo con ALB y certificado (`aws_lb_listener_rule.http_to_https`, verificado en código; S8 resuelto en código); efecto en prod **(por confirmar)** hasta el `apply` en prod, y se pierde si Beanstalk recrea el listener (S16). dev: instancia única sin HTTPS, que rompe el frontend (C4).
+- **Estado:** prod: listener 443 con la política `ELBSecurityPolicy-TLS13-1-2-2021-06` (verificado). Redirección 301 de 80 a 443 en el listener 80 solo con ALB y certificado (`aws_lb_listener_rule.http_to_https`, verificado en código; S8 resuelto en código); efecto en prod **(por confirmar)** hasta el `apply` en prod, y se pierde si Beanstalk recrea el listener (S16). dev: instancia única sin HTTPS, que rompe el frontend (C4). Frontend de prod: dominio propio (`sigmetum-a.org` y `www`) asociado en `modules/amplify` (C9 resuelto en código), con certificado gestionado por Amplify y validación por DNS (CNAME en Route53 creado por Terraform) y el apex como alias A (un CNAME no se permite en el apex) **(verificado en código)**; HSTS de un día (`max-age=86400`) sin `includeSubDomains` ni `preload`, a propósito mientras el dominio sea nuevo; efecto en AWS **(por confirmar)** hasta el `apply` en prod, y la validación del certificado no avisa si no cierra (`wait_for_verification = false`).
 
 ### SEG-9. Cabeceras de seguridad y acceso a preproducción (Amplify)
 
 - **Por qué:** limitan el daño si algo falla (XSS, clickjacking) y evitan que preproducción sea pública.
 - **Regla:** `customHeaders` de Amplify con `Content-Security-Policy`, `Strict-Transport-Security`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` y `frame-ancestors` (los orígenes que necesita el frontend, en la sección 6 de [para-infra.md](../../../sigmetum-frontend/docs/integracion/para-infra.md)). La rama de preproducción con autenticación básica de Amplify, si no debe ser pública.
 - **Cómo:** manual.
-- **Estado:** sin cabeceras definidas (C11). Sin `enable_basic_auth` en la rama de dev (verificado); si preproducción debe ser privada es **(por confirmar)** (S9).
+- **Estado:** cabeceras definidas en código en `dev` y `prod` (C11 resuelto en código, 31/10/2026): HSTS de un día, `nosniff`, `Referrer-Policy`, `Permissions-Policy` y `Content-Security-Policy-Report-Only` con `frame-ancestors 'none'`. **La CSP solo informa (Report-Only), no bloquea**, y no hay endpoint de informes: las violaciones solo se ven en la consola del navegador; se espera una por el `onload` inline de `index.html` (tarea del frontend) y `style-src` conserva `'unsafe-inline'`. Efecto en AWS **(por confirmar)** hasta el `apply` y un build nuevo. Sin `enable_basic_auth` en la rama de dev (verificado); si preproducción debe ser privada es **(por confirmar)** (S9).
 
 ### SEG-10. Amplify y el token de GitHub
 
@@ -135,14 +135,15 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | Bucket de datos: bloqueo de acceso público, cifrado, versionado | Sí |
 | Bucket de datos: política TLS, `prevent_destroy`, ciclo de vida | Sí en código (S5 parcial, M6); efecto por confirmar |
 | Bucket de datos: registros de acceso | No (S5) |
-| Recursos públicos del frontend por CloudFront con OAC (bucket privado) | Sí en código (C2 resuelto); sin `assets/…` subidos (C7); política de CloudFront solo sobre `assets/*` (C13 resuelto en código; efecto por confirmar) |
+| Recursos públicos del frontend por CloudFront con OAC (bucket privado) | Sí en código (C2 resuelto); `assets/…` subidos en `dev` (verificado 31/10/2026) y, en `prod`, pendientes de la subida con `scripts/sync-assets.mjs` (C7); política de CloudFront solo sobre `assets/*` (C13 resuelto en código; efecto por confirmar) |
 | Política IAM de `modules/storage` sin comodines | Sí, acotada a `gallery/*` y `data/*` (S7 resuelto en código; efecto por confirmar) |
 | Claves de acceso antiguas rotadas | **(por confirmar)** (S12) |
 | SSH cerrado por defecto, IMDSv1 desactivado | Sí |
 | VPC por defecto, instancias con IP pública | Sí (S13) |
 | HTTPS en prod con política TLS 1.3 | Sí; redirección de 80 a 443 en código (S8); efecto en prod por confirmar |
 | HTTPS en dev | Sí, CloudFront delante de Beanstalk (C4 resuelto) |
-| Cabeceras de seguridad en Amplify | Sin definir (C11) |
+| Cabeceras de seguridad en Amplify | Definidas en código (C11); CSP solo en Report-Only, no bloquea; HSTS de un día sin `includeSubDomains` ni `preload`; efecto por confirmar |
+| Dominio propio de prod con TLS gestionado por Amplify | Sí en código (C9); validación del certificado por DNS y apex como alias; efecto en prod por confirmar |
 | Autenticación básica en preproducción | No (S9) |
 | Token de GitHub de alcance `repo` | Sí, clásico (S10) |
 | CloudTrail, alertas de facturación, registros en CloudWatch | **(por confirmar)** / registros desactivados (S11) |

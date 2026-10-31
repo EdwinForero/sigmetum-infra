@@ -90,6 +90,13 @@ Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC par
 
 App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend (`preBuild`: `nvm install 22 && nvm use 22`, `npm ci` y `npm test`; `build`: `npm run build`; artefacto `dist`). Si `npm test` falla, Amplify no despliega. Define las variables `VITE_*` que se incrustan al compilar (ver [Variables de Amplify](#variables-de-amplify)).
 
+Además, la app lleva `custom_headers` (caché y seguridad, en `dev` y `prod`) y, **solo si `custom_domains` no está vacío** (hoy solo `prod`), la asociación de dominio y sus registros de Route53:
+
+- **Cabeceras** (`custom_headers` de `aws_amplify_app.this`): `Strict-Transport-Security: max-age=86400` (un día, sin `includeSubDomains` ni `preload`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (sin cámara, micrófono, geolocalización, pago ni USB) y `Content-Security-Policy-Report-Only` (solo informa, no bloquea). `Cache-Control: no-cache` en `/index.html` y `public, max-age=31536000, immutable` en `/assets/*`; ese patrón es el `dist/assets/` de Vite, no los ficheros del bucket (otro origen, CloudFront). La CSP se calcula en `locals` con `s3_url`, `backend_url` y la región del proveedor (`data.aws_region.current`): sin orígenes hardcodeados, así que `dev` y `prod` salen distintas. Efecto en AWS **(por confirmar)** hasta el `apply` y un build nuevo.
+- **Dominio**: `aws_amplify_domain_association.this` (uno por clave de `custom_domains`, con `wait_for_verification = false`, de modo que el `apply` no espera a la validación del certificado; Amplify gestiona el certificado por validación DNS).
+- **Registros de Route53** (`modules/dns` no cambia): el módulo consulta con `data.aws_route53_zone.custom` la zona pública que se llama igual que el dominio raíz y que debe estar en la cuenta donde se aplica. Crea `aws_route53_record.certificate_validation` (CNAME de validación del certificado), `aws_route53_record.apex` (alias de tipo A hacia la distribución de CloudFront que indica Amplify, porque un CNAME no se permite en el apex) y `aws_route53_record.subdomain` (CNAME para `www`, TTL 300). Sin AAAA y sin `allow_overwrite`: si ya existe un registro de apex o `www`, el `apply` falla con "already exists" y no pisa nada. Los destinos salen de `certificate_verification_dns_record` y `dns_record` de la asociación; si Amplify los devuelve vacíos en el primer `apply`, se repite el `apply` (la asociación ya está en el estado). Formato real de esos campos y alias del apex **(por confirmar)** hasta el `apply`.
+- Sin outputs nuevos; `branch_url` sigue siendo la URL del dominio por defecto, que sigue activa.
+
 ### Variables
 
 | Variable | Tipo | Por defecto | Descripción |
@@ -102,6 +109,7 @@ App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend (`
 | `backend_url` | string | — | URL base del backend inyectada como `VITE_BASE_URL` |
 | `s3_url` | string | `""` | URL base de CloudFront inyectada como `VITE_S3_URL`; usar `module.storage.cdn_url` (`dev` y `prod`) |
 | `carousel_image_keys` | string | `""` | Claves S3 separadas por comas inyectadas como `VITE_CAROUSEL_IMAGE_KEYS` |
+| `custom_domains` | map(list(string)) | `{}` | Dominio raíz => prefijos de subdominio (`""` es el apex, `"www"` es `www.<raíz>`). Vacío no crea asociación ni registros. La clave debe ser un nombre en minúsculas, sin esquema, ruta ni puerto (`validation`) |
 
 ### Outputs
 
@@ -188,7 +196,7 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## Entorno prod
 
-`environments/prod`: ALB con autoescalado y HTTPS, DNS en Route53, Amplify en `master` (con `s3_url = module.storage.cdn_url`). Estado remoto en el bucket de la cuenta de prod. Plantilla de valores: `environments/prod/terraform.tfvars.example`.
+`environments/prod`: ALB con autoescalado y HTTPS, DNS en Route53, Amplify en `master` (con `s3_url = module.storage.cdn_url`) y `custom_domains` fijo en `main.tf` (no es una variable del entorno): el dominio raíz de la zona con el apex y `www`; `dev` no lo define y por eso no crea dominio ni registros. Estado remoto en el bucket de la cuenta de prod. Plantilla de valores: `environments/prod/terraform.tfvars.example`.
 
 ### Variables
 
@@ -224,6 +232,6 @@ Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arr
 | `JWT_EXPIRATION` | Sí | Duración del token |
 | `ADMIN_USERNAME` | Sí | Usuario administrador |
 | `ADMIN_PASSWORD` | Sí | Hash bcrypt, nunca el texto en claro |
-| `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#abiertos)) |
+| `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#resueltos)). Admite una lista separada por comas; en `prod`, `https://<dominio>,https://www.<dominio>` (ver [para-backend.md](integracion/para-backend.md#7-allowed_origin-por-entorno)) |
 | `EMAIL` | Sí | Cuenta de correo del backend |
 | `EMAIL_PASSWORD` | Sí | Contraseña de aplicación, no la de la cuenta |
