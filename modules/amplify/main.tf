@@ -40,7 +40,7 @@ resource "aws_amplify_app" "this" {
   }
   # SPA catch-all: rewrite all other paths to index.html
   custom_rule {
-    source = "</^((?!\\.).)+$>"
+    source = "</^[^.]+$|\\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|pdf)$)([^.]+$)/>"
     status = "200"
     target = "/index.html"
   }

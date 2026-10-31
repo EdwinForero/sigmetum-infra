@@ -154,6 +154,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [docs/integracion/para-frontend.md](docs/integracion/para-frontend.md) | What this infrastructure provides to and needs from the frontend (Amplify, `VITE_*`, domains, static assets) |
 | [docs/integracion/para-backend.md](docs/integracion/para-backend.md) | What it provides to and needs from the backend (`app_env_vars`, health check, ALB, S3 IAM) |
 | [Spec](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-design.md), [plan](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-plan.md) and [PR notice](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-aviso-pr.md) | Integration adjustments with frontend and backend (30/10/2026): `s3_url` in prod, Node 22 and `npm test` in the Amplify `build_spec` |
+| [Spec](docs/specs/2026-10-30-fix-regla-spa-amplify-design.md), [plan](docs/specs/2026-10-30-fix-regla-spa-amplify-plan.md) and [PR notice](docs/specs/2026-10-30-fix-regla-spa-amplify-aviso-pr.md) | Amplify SPA rewrite rule fix (30/10/2026): `source` of the SPA rule in `</regex/>` format (C14) |
 
 ## CI and GitHub
 

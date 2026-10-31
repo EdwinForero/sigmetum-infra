@@ -19,6 +19,7 @@ Documento para quien mantiene `sigmetum-frontend`. Convención y estructura en [
 | **infra:C9** (parte de `frontend:I4`) | Falta el dominio del frontend en prod (`modules/dns` solo crea `backend.<zona>`) | No hay `ALLOWED_ORIGIN` de prod para el backend | Abierto |
 | **infra:C10** | El `build_spec` no fijaba Node ni ejecutaba `npm test` | Riesgo de compilar con otra versión o desplegar una build rota | **Resuelto en código** (Node 22 con `nvm` y `npm test` en `preBuild`); efecto en Amplify **(por confirmar)** hasta el `apply` |
 | **infra:C11** | Sin cabeceras de caché ni CSP en Amplify | Sección 6 de `para-infra.md` del frontend | Abierto |
+| **infra:C14** (= `frontend:I3`, `backend:F16`) | En el Amplify de `dev`, `/explorar` responde `301` a `/explorar/` y luego `404` aunque las dos `custom_rule` estaban aplicadas | Recargar o abrir un enlace directo a una ruta de la SPA falla | **Resuelto en código** (`source` de la regla SPA en `</regex/>`); comportamiento en `dev` y `prod` **(por confirmar)** hasta el `apply`. Se reabre si `/explorar` sigue dando `301` o `404` |
 
 El detalle de cada uno está en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md#abiertos).
 
@@ -63,9 +64,11 @@ Dos `custom_rule` **(verificado en `modules/amplify/main.tf`)**, en este orden:
 | Origen | Destino | Estado |
 |---|---|---|
 | `/assets/<*>` | `/assets/<*>` | `200` (los recursos con hash pasan tal cual) |
-| `</^((?!\.).)+$>` | `/index.html` | `200` (rutas sin extensión, la SPA) |
+| `</^[^.]+$\|\.(?!(css\|gif\|ico\|jpg\|js\|png\|txt\|svg\|woff\|woff2\|ttf\|map\|json\|webp\|pdf)$)([^.]+$)/>` | `/index.html` | `200` (la SPA: rutas sin punto y rutas con punto cuya extensión no está en la lista) |
 
-Resuelven infra:C3. Las cabeceras de caché que propone `para-infra.md` del frontend (sección 6) quedan pendientes (infra:C11).
+En la tabla, `\|` es solo el escape de la barra vertical de Markdown: el valor real de `source` usa `|` y termina en `/>` (en HCL, `\.` se escribe `\\.`). Las rutas con punto cuya extensión no está en la lista (css, gif, ico, jpg, js, png, txt, svg, woff, woff2, ttf, map, json, webp, pdf) también se reescriben a `index.html`: es un límite conocido, y afecta por ejemplo a `.avif`, `.mp4`, `.xml`, `.webmanifest` y a extensiones en mayúsculas. La lista se amplía solo si el frontend lo pide. Resuelven infra:C3 e infra:C14.
+
+**Causa de infra:C14 (por confirmar).** La hipótesis es que el `source` anterior terminaba en `$>` y no en `/>`, y que sin la `/` final Amplify no lo trataba como expresión regular. No está confirmada, y el `301` a barra final podría ser un comportamiento propio de Amplify independiente de las reglas. Tras el `apply` hay que probar `/explorar`, `/explorar/` y una ruta anidada, para distinguir si el `301` desaparece o solo cambia de código; si sigue habiendo `301` o `404`, C14 se reabre. Las cabeceras de caché que propone `para-infra.md` del frontend (sección 6) quedan pendientes (infra:C11).
 
 ### Cabeceras
 
