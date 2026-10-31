@@ -77,7 +77,7 @@ Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC par
 
 ## Módulo amplify
 
-App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend. Define las variables `VITE_*` que se incrustan al compilar (ver [Variables de Amplify](#variables-de-amplify)).
+App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend (`preBuild`: `nvm install 22 && nvm use 22`, `npm ci` y `npm test`; `build`: `npm run build`; artefacto `dist`). Si `npm test` falla, Amplify no despliega. Define las variables `VITE_*` que se incrustan al compilar (ver [Variables de Amplify](#variables-de-amplify)).
 
 ### Variables
 
@@ -89,7 +89,7 @@ App de Amplify conectada a GitHub, con su rama y el `build_spec` del frontend. D
 | `github_access_token` | string | — | Token de GitHub con permiso `repo` (sensible) |
 | `branch` | string | `master` | Rama que se despliega |
 | `backend_url` | string | — | URL base del backend inyectada como `VITE_BASE_URL` |
-| `s3_url` | string | `""` | URL base de CloudFront inyectada como `VITE_S3_URL`; usar `module.storage.cdn_url` |
+| `s3_url` | string | `""` | URL base de CloudFront inyectada como `VITE_S3_URL`; usar `module.storage.cdn_url` (`dev` y `prod`) |
 | `carousel_image_keys` | string | `""` | Claves S3 separadas por comas inyectadas como `VITE_CAROUSEL_IMAGE_KEYS` |
 
 ### Outputs
@@ -107,7 +107,7 @@ Variables de entorno que el módulo define en la app y en la rama. Se comparan c
 | Variable | Dónde | Valor |
 |---|---|---|
 | `VITE_BASE_URL` | App y rama | `backend_url` |
-| `VITE_API_PREFIX` | App y rama | `/api` (fijo) |
+| `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` → `module.storage.cdn_url` (URL de CloudFront) |
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` |
 | `NODE_ENV` | App | `environment` |
@@ -177,7 +177,7 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## Entorno prod
 
-`environments/prod`: ALB con autoescalado y HTTPS, DNS en Route53, Amplify en `master`. Estado remoto en el bucket de la cuenta de prod. Plantilla de valores: `environments/prod/terraform.tfvars.example`.
+`environments/prod`: ALB con autoescalado y HTTPS, DNS en Route53, Amplify en `master` (con `s3_url = module.storage.cdn_url`). Estado remoto en el bucket de la cuenta de prod. Plantilla de valores: `environments/prod/terraform.tfvars.example`.
 
 ### Variables
 

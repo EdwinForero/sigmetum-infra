@@ -63,7 +63,7 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 - **Por qué:** el bucket guarda la investigación y, hoy, también los recursos que el frontend necesita públicos.
 - **Regla:** bloqueo de acceso público con sus cuatro opciones, cifrado en reposo, versionado, política que exija TLS (`aws:SecureTransport`), registros de acceso y `prevent_destroy`. Los recursos públicos del frontend se sirven con **CloudFront y OAC** (el bucket sigue privado) y no abriendo el bucket.
 - **Cómo:** `quality-check` falla en un bucket nuevo sin bloqueo de acceso público, cifrado o versionado; y avisa (deuda) de la política TLS, los registros y `prevent_destroy`.
-- **Estado:** bloqueo de acceso público, cifrado AES256 y versionado: sí (verificado). Política TLS y registros de acceso: no (S5). `prevent_destroy`: no (M6). Los recursos públicos no se sirven hoy: el bloqueo de acceso público impide que el navegador los lea (C2), y no hay CloudFront.
+- **Estado:** bloqueo de acceso público, cifrado AES256 y versionado: sí (verificado). Política TLS y registros de acceso: no (S5). `prevent_destroy`: no (M6). Los recursos públicos se sirven por CloudFront con OAC (`modules/storage/main.tf`, verificado): el bucket sigue privado y la política `AllowCloudFrontOAC` solo admite a la distribución. Esa política da `s3:GetObject` sobre todo el bucket y la distribución no filtra por prefijo, así que CloudFront podría servir también `data/` y `gallery/` (C13, **(por confirmar)**). Nada sube aún `assets/…` (C7).
 
 ### SEG-7. Red y cómputo
 
@@ -134,13 +134,13 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | Estado remoto: cifrado explícito, bloqueo, política TLS, bloqueo de acceso público | No consta (S3, S4) |
 | Bucket de datos: bloqueo de acceso público, cifrado, versionado | Sí |
 | Bucket de datos: política TLS, registros, `prevent_destroy` | No (S5, M6) |
-| Recursos públicos del frontend accesibles | No (C2) |
+| Recursos públicos del frontend por CloudFront con OAC (bucket privado) | Sí en código (C2 resuelto); sin `assets/…` subidos (C7); alcance de la política sobre todo el bucket (C13, por confirmar) |
 | Política IAM de `modules/storage` sin comodines | Sí, pero con escritura sobre todo el bucket (S7) |
 | Claves de acceso antiguas rotadas | **(por confirmar)** (S12) |
 | SSH cerrado por defecto, IMDSv1 desactivado | Sí |
 | VPC por defecto, instancias con IP pública | Sí (S13) |
 | HTTPS en prod con política TLS 1.3 | Sí; sin redirección de 80 a 443 (S8) |
-| HTTPS en dev | No (C4) |
+| HTTPS en dev | Sí, CloudFront delante de Beanstalk (C4 resuelto) |
 | Cabeceras de seguridad en Amplify | Sin definir (C11) |
 | Autenticación básica en preproducción | No (S9) |
 | Token de GitHub de alcance `repo` | Sí, clásico (S10) |

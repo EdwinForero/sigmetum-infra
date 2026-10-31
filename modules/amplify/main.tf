@@ -9,7 +9,9 @@ resource "aws_amplify_app" "this" {
       phases:
         preBuild:
           commands:
+            - nvm install 22 && nvm use 22
             - npm ci
+            - npm test
         build:
           commands:
             - npm run build

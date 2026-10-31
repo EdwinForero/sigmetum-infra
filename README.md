@@ -109,7 +109,7 @@ Beanstalk deploys automatically when you push a new application bundle. Upload a
 
 ### Deploy frontend
 
-Amplify auto-builds on every push to the configured branch (`feature/testing` for preprod, `master` for prod).
+Amplify auto-builds on every push to the configured branch (`feature/testing` for preprod, `master` for prod). The build pins Node 22 with `nvm` and runs `npm test` in `preBuild`: if the tests fail, Amplify does not deploy.
 
 ### Destroy an environment
 
@@ -153,6 +153,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [docs/billing-tags.md](docs/billing-tags.md) | Cost tags |
 | [docs/integracion/para-frontend.md](docs/integracion/para-frontend.md) | What this infrastructure provides to and needs from the frontend (Amplify, `VITE_*`, domains, static assets) |
 | [docs/integracion/para-backend.md](docs/integracion/para-backend.md) | What it provides to and needs from the backend (`app_env_vars`, health check, ALB, S3 IAM) |
+| [Spec](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-design.md), [plan](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-plan.md) and [PR notice](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-aviso-pr.md) | Integration adjustments with frontend and backend (30/10/2026): `s3_url` in prod, Node 22 and `npm test` in the Amplify `build_spec` |
 
 ## CI and GitHub
 

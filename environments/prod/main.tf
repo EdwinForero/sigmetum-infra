@@ -53,6 +53,5 @@ module "amplify" {
   github_access_token = var.github_access_token
   branch              = "master"
   backend_url         = "https://backend.sigmetum-a.org"
-  # s3_url left empty until C2 (S3 public access / CloudFront) is resolved
-  s3_url = ""
+  s3_url              = module.storage.cdn_url
 }
