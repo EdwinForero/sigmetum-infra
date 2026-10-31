@@ -1,21 +1,26 @@
 output "beanstalk_url" {
-  value = module.beanstalk.endpoint_url
+  description = "Beanstalk environment endpoint (CNAME, no scheme)."
+  value       = module.beanstalk.endpoint_url
 }
 
 output "backend_cdn_url" {
-  value = module.beanstalk.backend_cdn_url
+  description = "CloudFront HTTPS URL of the backend (dev only), used as the frontend backend_url."
+  value       = module.beanstalk.backend_cdn_url
 }
 
 output "amplify_url" {
-  value = module.amplify.branch_url
+  description = "URL of the deployed Amplify branch."
+  value       = module.amplify.branch_url
 }
 
 output "s3_bucket" {
-  value = module.storage.bucket_name
+  description = "Name of the S3 bucket."
+  value       = module.storage.bucket_name
 }
 
 output "cdn_url" {
-  value = module.storage.cdn_url
+  description = "CloudFront HTTPS URL for the public frontend assets."
+  value       = module.storage.cdn_url
 }
 
 output "ci_role_arn" {

@@ -4,11 +4,13 @@ output "endpoint_url" {
 }
 
 output "environment_name" {
-  value = aws_elastic_beanstalk_environment.this.name
+  description = "Name of the Beanstalk environment."
+  value       = aws_elastic_beanstalk_environment.this.name
 }
 
 output "application_name" {
-  value = aws_elastic_beanstalk_application.this.name
+  description = "Name of the Beanstalk application."
+  value       = aws_elastic_beanstalk_application.this.name
 }
 
 output "load_balancers" {

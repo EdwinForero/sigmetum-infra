@@ -1,6 +1,5 @@
 module "networking" {
-  source      = "../../modules/networking"
-  environment = "prod"
+  source = "../../modules/networking"
 }
 
 # ALB + Auto Scaling 1→3, HTTPS, Rolling deployment

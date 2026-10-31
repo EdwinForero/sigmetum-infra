@@ -12,9 +12,7 @@ Usa el VPC y las subredes por defecto de la cuenta (solo `data` sources; no crea
 
 ### Variables
 
-| Variable | Tipo | Por defecto | Descripción |
-|---|---|---|---|
-| `environment` | string | — | Nombre del entorno. El módulo no la usa internamente |
+Sin variables.
 
 ### Outputs
 
@@ -44,7 +42,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `ssh_key_name` | string | `""` | Par de claves EC2; vacío desactiva SSH |
 | `ssh_allowed_cidrs` | list(string) | `[]` | CIDR con acceso SSH; solo aplica si hay `ssh_key_name` |
 | `notification_email` | string | — | Correo de las notificaciones SNS del entorno |
-| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible). Claves en [app_env_vars](#app_env_vars) |
+| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible). Claves en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` las nueve claves obligatorias (por nombre, no por valor) y acepta claves extra |
 
 ### Outputs
 
@@ -178,7 +176,6 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 |---|---|---|---|
 | `notification_email` | string | — | Correo de notificaciones de Beanstalk |
 | `bucket_name` | string | — | Nombre del bucket S3 |
-| `ssl_certificate_arn` | string | `""` | Declarada pero sin uso en `dev` |
 | `github_access_token` | string | — | Token de GitHub (sensible) |
 | `github_repository` | string | — | URL del repositorio del frontend |
 | `app_env_vars` | map(string) | `{}` | Variables de la aplicación (sensible) |
@@ -221,7 +218,7 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## app_env_vars
 
-Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Son **secretos**: los valores solo viven en `terraform.tfvars` (ignorado por git).
+Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Son **secretos**: los valores solo viven en `terraform.tfvars` (ignorado por git). La variable `app_env_vars` de `modules/beanstalk` lleva una `validation` que comprueba en `plan` que estén las nueve claves obligatorias de la tabla (solo los nombres, nunca los valores); las claves extra son válidas y un valor vacío no se rechaza.
 
 | Clave | Obligatoria en el backend | Notas |
 |---|---|---|

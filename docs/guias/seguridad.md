@@ -25,7 +25,7 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 - **Por qué:** lo que entra en el historial no se puede retirar de verdad; hay que rotarlo.
 - **Regla:** `terraform.tfvars` y el estado están fuera de git; las plantillas `*.example` solo llevan marcadores. No se escriben valores en documentos, scripts, PR ni conversaciones. No se comparten identificadores de cuenta en documentos nuevos (usa `<ID_CUENTA>`).
 - **Cómo:** `quality-check` busca claves de AWS, claves privadas, tokens de GitHub, hashes bcrypt y ARN con identificador de cuenta en los `.tf`, ejemplos, documentos y scripts; falla si hay `.tfvars`, `.tfstate`, `.terraform/` o claves versionados; y exige las entradas del `.gitignore`.
-- **Estado:** cumple. `terraform.tfvars` no está versionado (verificado) y no se han detectado secretos. Las guías de puesta en marcha contienen identificadores de cuenta (S1).
+- **Estado:** cumple. `terraform.tfvars` no está versionado (verificado) y no se han detectado secretos. Las guías de puesta en marcha usan los marcadores `<ID_CUENTA_GESTION>`, `<ID_CUENTA_DEV>` y `<ID_CUENTA_PROD>`: ya no contienen identificadores de cuenta (S1, resuelto).
 
 ### SEG-2. Secretos de la aplicación: dónde viven en Beanstalk
 
@@ -128,7 +128,7 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | Secretos en `.tf`, ejemplos, documentos y scripts | **Ninguno** |
 | `terraform.tfvars`, estado y `.terraform/` versionados | **No** |
 | Variables con secretos con `sensitive = true` | Sí |
-| Identificadores de cuenta en documentos | Sí, en dos guías (S1) |
+| Identificadores de cuenta en documentos | Ninguno (S1, resuelto) |
 | Secretos de la aplicación en propiedades de entorno de Beanstalk | Sí (S6) |
 | Estado remoto: versionado | Sí (a mano) |
 | Estado remoto: cifrado explícito, bloqueo, política TLS, bloqueo de acceso público | No consta (S3, S4) |

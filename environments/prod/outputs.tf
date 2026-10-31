@@ -1,17 +1,21 @@
 output "beanstalk_url" {
-  value = module.beanstalk.endpoint_url
+  description = "Beanstalk environment endpoint (CNAME, no scheme)."
+  value       = module.beanstalk.endpoint_url
 }
 
 output "backend_fqdn" {
-  value = module.dns.backend_fqdn
+  description = "Route53 domain name of the backend."
+  value       = module.dns.backend_fqdn
 }
 
 output "amplify_url" {
-  value = module.amplify.branch_url
+  description = "URL of the deployed Amplify branch."
+  value       = module.amplify.branch_url
 }
 
 output "s3_bucket" {
-  value = module.storage.bucket_name
+  description = "Name of the S3 bucket."
+  value       = module.storage.bucket_name
 }
 
 output "ci_role_arn" {

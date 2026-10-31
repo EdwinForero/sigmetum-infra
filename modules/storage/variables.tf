@@ -1,5 +1,6 @@
 variable "environment" {
-  type = string
+  description = "Deployment environment: dev or prod. Used in the names of the OAC and of the S3 access policy."
+  type        = string
 }
 
 variable "bucket_name" {

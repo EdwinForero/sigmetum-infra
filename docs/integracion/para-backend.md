@@ -19,6 +19,8 @@ Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [m
 
 El backend exige estas variables al arrancar (`config/validateEnv.js`, verificado). Solo se listan **nombres**, nunca valores. Además de existir, algunas tienen reglas de valor (validación estricta):
 
+Desde la limpieza de deuda M7 (31/10/2026), la variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las nueve obligatorias de la tabla (sin revelar valores) y acepta claves extra; no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. El contrato no cambia.
+
 | Variable | Exigida por el backend | La define `app_env_vars` hoy | Es secreto |
 |---|---|---|---|
 | `JWT_SECRET` | Sí | Sí | Sí |

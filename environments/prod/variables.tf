@@ -1,9 +1,11 @@
 variable "notification_email" {
-  type = string
+  description = "Email address that receives the Beanstalk SNS notifications (health, deploy)."
+  type        = string
 }
 
 variable "bucket_name" {
-  type = string
+  description = "Globally unique name of the S3 bucket for app data and assets."
+  type        = string
 }
 
 variable "ssl_certificate_arn" {
@@ -12,16 +14,19 @@ variable "ssl_certificate_arn" {
 }
 
 variable "github_access_token" {
-  type      = string
-  sensitive = true
+  description = "GitHub personal access token that Amplify uses to read the frontend repository."
+  type        = string
+  sensitive   = true
 }
 
 variable "github_repository" {
-  type = string
+  description = "URL of the frontend GitHub repository that Amplify builds."
+  type        = string
 }
 
 variable "app_env_vars" {
-  type      = map(string)
-  sensitive = true
-  default   = {}
+  description = "Application environment variables for the backend process, passed to the beanstalk module. Sensitive; the keys are listed in docs/referencia-modulos.md."
+  type        = map(string)
+  sensitive   = true
+  default     = {}
 }

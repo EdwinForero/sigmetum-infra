@@ -3,7 +3,7 @@
 Crea cuentas separadas para preprod y prod. Un error en preprod nunca toca prod y los costos quedan aislados por cuenta.
 
 ```
-cuenta management (502768731030)   ← desde aquí corres Terraform
+cuenta management (<ID_CUENTA_GESTION>)   ← desde aquí corres Terraform
     ├── sigmetum-preprod            ← environments/dev
     └── sigmetum-prod               ← environments/prod
 ```
@@ -45,7 +45,7 @@ Hazlo inmediatamente después de crear la cuenta para detectar gastos inesperado
 
 ## 1. Activar AWS Organizations
 
-1. Busca **AWS Organizations** en la consola (desde tu cuenta 502768731030)
+1. Busca **AWS Organizations** en la consola (desde tu cuenta <ID_CUENTA_GESTION>)
 2. Clic en **Create organization**
 3. Confirma — tu cuenta pasa a ser la cuenta raíz (management)
 
@@ -88,8 +88,8 @@ Hazlo dos veces con estos datos:
 
 | Cuenta | Account ID |
 |---|---|
-| sigmetum-preprod | `698815298450` |
-| sigmetum-prod | `480836974880` |
+| sigmetum-preprod | `<ID_CUENTA_DEV>` |
+| sigmetum-prod | `<ID_CUENTA_PROD>` |
 
 ---
 

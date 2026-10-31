@@ -1,7 +1,9 @@
 output "vpc_id" {
-  value = data.aws_vpc.default.id
+  description = "ID of the default VPC."
+  value       = data.aws_vpc.default.id
 }
 
 output "subnet_ids" {
-  value = data.aws_subnets.default.ids
+  description = "IDs of the default subnets, one per availability zone."
+  value       = data.aws_subnets.default.ids
 }

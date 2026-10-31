@@ -73,7 +73,7 @@ cd environments/dev
 set AWS_PROFILE=sigmetum-preprod
 ```
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev).
+Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev). `terraform plan` fails with "Invalid value for variable" if `app_env_vars` lacks any of the nine keys the backend requires at startup (names only are checked, never values).
 
 ```powershell
 terraform init
@@ -95,7 +95,7 @@ cd environments/prod
 set AWS_PROFILE=sigmetum-prod
 ```
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod).
+Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod). `terraform plan` fails with "Invalid value for variable" if `app_env_vars` lacks any of the nine keys the backend requires at startup (names only are checked, never values).
 
 ```powershell
 terraform init
@@ -167,6 +167,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [Spec](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-design.md), [plan](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-plan.md) and [PR notice](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-aviso-pr.md) | Integration adjustments with frontend and backend (30/10/2026): `s3_url` in prod, Node 22 and `npm test` in the Amplify `build_spec` |
 | [Spec](docs/specs/2026-10-30-fix-regla-spa-amplify-design.md), [plan](docs/specs/2026-10-30-fix-regla-spa-amplify-plan.md) and [PR notice](docs/specs/2026-10-30-fix-regla-spa-amplify-aviso-pr.md) | Amplify SPA rewrite rule fix (30/10/2026): `source` of the SPA rule in `</regex/>` format (C14) |
 | [Spec](docs/specs/2026-10-30-seguridad-bucket-iam-tls-design.md), [plan](docs/specs/2026-10-30-seguridad-bucket-iam-tls-plan.md) and [PR notice](docs/specs/2026-10-30-seguridad-bucket-iam-tls-aviso-pr.md) | Bucket, instance IAM, TLS and ALB security (30/10/2026): CloudFront only on `assets/*`, IAM by prefix, TLS deny, `prevent_destroy`, lifecycle and prod 80 to 443 redirect (C13, S7, S8, M6; S5 partial) |
+| [Spec](docs/specs/2026-10-31-limpieza-deuda-c-design.md), [plan](docs/specs/2026-10-31-limpieza-deuda-c-plan.md) and [PR notice](docs/specs/2026-10-31-limpieza-deuda-c-aviso-pr.md) | Debt cleanup (31/10/2026): unused variables removed, descriptions on all variables and outputs, `app_env_vars` key validation in the beanstalk module, account IDs replaced by markers in two guides (M1, M4, M2, M7, S1); no resource changes |
 
 ## CI and GitHub
 

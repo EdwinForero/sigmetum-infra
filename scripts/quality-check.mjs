@@ -35,8 +35,8 @@ const check = (name, problems, notes = []) => results.push({ name, problems, not
 // Deuda conocida: incumplimientos de hoy, registrados en docs/estado-y-deuda-tecnica.md. Se listan para que
 // no puedan extenderse a nada nuevo. Al resolver un hallazgo, se quita de aquí y se pasa a "Resueltos".
 const KNOWN_DEBT = {
-  // terraform fmt: archivos que hoy no pasan
-  fmt: { 'environments/prod/main.tf': 'M4 (alineación del módulo dns; se corrige en un commit aparte)' },
+  // terraform fmt: archivos que hoy no pasan — M4 resuelto; no queda ninguno, objeto vacío retenido para estructura
+  fmt: {},
   // .terraform.lock.hcl ignorado por git
   lockfileIgnored: 'M5 (la práctica recomendada es versionarlo)',
   // bloque backend "s3" sin cifrado explícito ni bloqueo de concurrencia
@@ -49,23 +49,10 @@ const KNOWN_DEBT = {
   },
   // recursos etiquetables sin la etiqueta Component — M8 resuelto; objeto vacío retenido para estructura
   untagged: {},
-  // variables sin description (todas tienen type)
-  noDescription: {
-    id: 'M7',
-    names: [
-      'environments/dev:notification_email', 'environments/dev:bucket_name', 'environments/dev:ssl_certificate_arn',
-      'environments/dev:github_access_token', 'environments/dev:github_repository', 'environments/dev:app_env_vars',
-      'environments/prod:notification_email', 'environments/prod:bucket_name', 'environments/prod:github_access_token',
-      'environments/prod:github_repository', 'environments/prod:app_env_vars',
-      'modules/amplify:environment', 'modules/amplify:app_name',
-      'modules/beanstalk:environment', 'modules/beanstalk:instance_type', 'modules/beanstalk:min_instances',
-      'modules/beanstalk:max_instances', 'modules/beanstalk:vpc_id', 'modules/beanstalk:subnet_ids',
-      'modules/beanstalk:load_balancer_type', 'modules/beanstalk:notification_email',
-      'modules/networking:environment', 'modules/storage:environment',
-    ],
-  },
-  // documentos que contienen identificadores de cuenta de AWS (no son secretos, pero se prefieren marcadores)
-  accountIds: { 'docs/aws-cli-setup.md': 'S1', 'docs/aws-organizations-setup.md': 'S1' },
+  // variables sin description (todas tienen type) — M7 resuelto; lista vacía retenida para estructura
+  noDescription: { id: 'M7', names: [] },
+  // documentos que contienen identificadores de cuenta de AWS — S1 resuelto; no queda ninguno, objeto vacío retenido para estructura
+  accountIds: {},
 };
 
 // Variables cuyo nombre parece un secreto pero no lo es.

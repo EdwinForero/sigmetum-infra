@@ -21,7 +21,7 @@
 ## 2. Activar IAM Identity Center
 
 IAM Identity Center permite hacer login por navegador — sin access keys estáticas.
-Hacerlo una vez desde la cuenta management (502768731030).
+Hacerlo una vez desde la cuenta management (<ID_CUENTA_GESTION>).
 
 > **Región:** IAM Identity Center es regional. Actívalo en `eu-west-3` (París) — misma región que los recursos.
 
@@ -83,7 +83,7 @@ SSO registration scopes:   sso:account:access
 Se abrirá el navegador → aprueba el acceso. Luego el CLI lista las cuentas disponibles y pide los valores del perfil:
 
 ```
-Account: 698815298450 (sigmetum-preprod)
+Account: <ID_CUENTA_DEV> (sigmetum-preprod)
 Role:    AdministratorAccess
 CLI default client Region [None]: eu-west-3
 CLI default output format [None]: json
@@ -101,7 +101,7 @@ SSO region:                eu-west-3
 SSO registration scopes:   sso:account:access
 ```
 ```
-Account: 480836974880 (sigmetum-prod)
+Account: <ID_CUENTA_PROD> (sigmetum-prod)
 Role:    AdministratorAccess
 CLI default client Region [None]: eu-west-3
 CLI default output format [None]: json
@@ -113,13 +113,13 @@ El resultado en `~/.aws/config` queda así:
 ```ini
 [profile sigmetum-preprod]
 sso_session = sigmetum
-sso_account_id = 698815298450
+sso_account_id = <ID_CUENTA_DEV>
 sso_role_name = AdministratorAccess
 region = eu-west-3
 
 [profile sigmetum-prod]
 sso_session = sigmetum
-sso_account_id = 480836974880
+sso_account_id = <ID_CUENTA_PROD>
 sso_role_name = AdministratorAccess
 region = eu-west-3
 

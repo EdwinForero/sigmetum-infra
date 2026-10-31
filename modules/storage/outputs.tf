@@ -1,9 +1,11 @@
 output "bucket_name" {
-  value = aws_s3_bucket.app.bucket
+  description = "Name of the data and assets S3 bucket."
+  value       = aws_s3_bucket.app.bucket
 }
 
 output "bucket_arn" {
-  value = aws_s3_bucket.app.arn
+  description = "ARN of the data and assets S3 bucket."
+  value       = aws_s3_bucket.app.arn
 }
 
 output "cdn_url" {

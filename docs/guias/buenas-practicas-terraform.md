@@ -15,21 +15,21 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 - **Regla:** `modules/` contiene piezas reutilizables con una responsabilidad (red, cómputo, almacenamiento, frontend, DNS). `environments/` no define recursos propios: llama a módulos y les pasa valores. Los dos entornos se mantienen **alineados**; una diferencia intencionada (balanceador solo en prod, DNS solo en prod) se explica en la tabla del [README](../../README.md).
 - **Por qué:** cada entorno vive en una cuenta distinta; si difieren sin que se sepa, lo que se prueba en preprod no se parece a lo que se despliega en prod.
 - **Cómo:** `docs-check` exige que todo módulo lo use algún entorno y esté en el README y en la referencia. La alineación entre entornos es revisión manual (compara los dos `main.tf`).
-- **Estado:** cumple. Los entornos no declaran recursos. Dos valores de configuración siguen escritos a mano en el entorno en lugar de ser variables (la zona `sigmetum-a.org` en prod y la rama de Amplify); es aceptable mientras solo haya un valor posible. `ssl_certificate_arn` está declarada en dev sin usarse (M1).
+- **Estado:** cumple. Los entornos no declaran recursos. Dos valores de configuración siguen escritos a mano en el entorno en lugar de ser variables (la zona `sigmetum-a.org` en prod y la rama de Amplify); es aceptable mientras solo haya un valor posible.
 
 ### BP-2. Variables: tipo, descripción, validación y `sensitive`
 
 - **Regla:** toda variable lleva `type` y `description`. Lleva `validation` cuando hay valores que no tienen sentido (como `load_balancer_type`). Un secreto lleva `sensitive = true`. Los valores por defecto son seguros (por ejemplo, SSH cerrado). Nada de valores reales en `terraform.tfvars.example`: solo marcadores (`CHANGE_ME_...`, `YOUR_...`).
 - **Por qué:** la descripción es la documentación que ve quien lee `terraform plan`; la validación falla antes de tocar AWS; `sensitive` evita imprimir el valor en la salida.
 - **Cómo:** `quality-check` falla con variables nuevas sin `type` o `description`, con nombres de secreto (`password`, `secret`, `token`, `key`, `env_vars`) sin `sensitive = true`, y con secretos o identificadores de cuenta en los ejemplos. `docs-check` compara las variables con la referencia.
-- **Estado:** parcial. Todas tienen `type`; las que no tienen `description` están registradas como deuda (M7). Solo una tiene `validation`. Las claves obligatorias de `app_env_vars` no se validan, por lo que falta alguna hasta que el backend no arranca (C5): una `validation` que exija `ADMIN_USERNAME`, `ADMIN_PASSWORD` y `ALLOWED_ORIGIN` lo evitaría (**por confirmar** que la validación funcione sobre un mapa sensible en la versión de Terraform en uso).
+- **Estado:** cumple. Todas tienen `type` y `description` (M7, resuelto). `app_env_vars` de `modules/beanstalk` lleva una `validation` que exige en `plan` las nueve claves obligatorias del backend, por nombre y sin revelar valores, también sobre un mapa sensible (prueba desechable con Terraform 1.15.5; con 1.5 **(por confirmar)**). La comprobación con los `terraform.tfvars` reales queda para el `plan` de quien despliega **(por confirmar)**.
 
 ### BP-3. Outputs: solo lo necesario y nunca secretos
 
 - **Regla:** un módulo expone solo lo que otro módulo o un entorno consume, o lo que una persona necesita ver tras el `apply`. Cada output lleva `description`. Un output que derive de un valor sensible lleva `sensitive = true`.
 - **Por qué:** los outputs aparecen en la salida y en el estado; cada uno es una interfaz que hay que mantener.
 - **Cómo:** `quality-check` falla si un output parece secreto o usa una variable sensible sin `sensitive`. `docs-check` compara los outputs con la referencia.
-- **Estado:** sin secretos en los outputs (verificado). Varios outputs de módulo no los consume ningún entorno (por ejemplo `app_id`, `bucket_arn`, `zone_id`, `load_balancers`); no hacen daño, pero hay que decidir si se quedan. La mayoría carece de `description` (M7).
+- **Estado:** sin secretos en los outputs (verificado). Varios outputs de módulo no los consume ningún entorno (por ejemplo `app_id`, `bucket_arn`, `zone_id`, `load_balancers`); no hacen daño, pero hay que decidir si se quedan. Todos llevan `description` (M7, resuelto); los que no consume ningún entorno se mantienen sin podar y están anotados en el estado.
 
 ### BP-4. Versiones y archivo de bloqueo
 
@@ -85,7 +85,7 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 - **Regla:** `snake_case`; nombres de recurso coherentes; los comentarios explican el **porqué** (una restricción, un coste, una decisión) y no repiten el código. **Sin `provisioner`, `null_resource` ni `local-exec`.** `terraform fmt` antes de cada commit.
 - **Por qué:** los provisioners esconden pasos que Terraform no puede planificar ni revertir.
 - **Cómo:** `quality-check` falla con `provisioner`, `null_resource`, `local-exec` o `remote-exec`, y con archivos que no pasan `terraform fmt`.
-- **Estado:** cumple, sin provisioners. El recurso principal se llama `this` en unos módulos y `app` en `storage` (incoherencia menor). `environments/prod/main.tf` no pasa `fmt` (M4).
+- **Estado:** cumple, sin provisioners. El recurso principal se llama `this` en unos módulos y `app` en `storage` (incoherencia menor).
 
 ### BP-11. Interfaz con el frontend y el backend
 
@@ -103,10 +103,8 @@ Lo que no se debe imitar y ya está registrado:
 | URL del backend en `http://` construida con el endpoint | `environments/dev/main.tf` | C4 |
 | Health check a `/` cuando la ruta de salud es `/healthcheck` | `modules/beanstalk/main.tf` | C6 |
 | Variable de entorno con el nombre equivocado para el frontend | `modules/amplify/main.tf` | C1 |
-| `NODE_ENV` con un valor no estándar (`dev`, `prod`) | `modules/amplify/main.tf` | M2 |
+| `NODE_ENV` con un valor no estándar (`dev`, `prod`): cerrado como «no afecta» a la compilación en `dev`; en `prod` **(por confirmar)** | `modules/amplify/main.tf` | M2 |
 | Nombre del rol de Beanstalk escrito a mano en el módulo de almacenamiento (acopla el módulo a un rol creado fuera de Terraform) | `modules/storage/main.tf` | M3, S7 |
-| Variables declaradas y sin uso | `environments/dev/variables.tf`, `modules/networking/variables.tf` | M1 |
-| Variables sin `description` y outputs sin documentar | varios | M7 |
 | `output` que construye una URL con `/` en el nombre de rama | `modules/amplify/outputs.tf` | C8 |
 | Secretos pasados como propiedades de entorno de Beanstalk | `modules/beanstalk/main.tf` | S6 |
 | `.terraform.lock.hcl` ignorado | `.gitignore` | M5 |
@@ -115,14 +113,14 @@ Lo que no se debe imitar y ya está registrado:
 
 | Comprobación | Resultado |
 |---|---|
-| `terraform fmt -check -recursive` | Falla en `environments/prod/main.tf` (M4) |
+| `terraform fmt -check -recursive` | Sin errores (M4, resuelto) |
 | `terraform validate` en `dev` y `prod` | Sin errores |
 | Proveedor `aws` | `~> 5.0` |
 | `required_version` | `>= 1.5` (sin techo) |
 | `.terraform.lock.hcl` versionado | **No** (M5) |
 | Entornos que solo componen módulos | Sí |
 | Provisioners o `null_resource` | Ninguno |
-| Variables sin `description` | Deuda registrada (M7) |
+| Variables sin `description` | Ninguna (M7, resuelto) |
 | Secretos en `.tf`, ejemplos y documentos | Ninguno (`quality-check`) |
 | Bloqueo de concurrencia y `encrypt` en el estado | No (S3) |
 | `prevent_destroy` en el bucket de datos | Sí en código (M6) |

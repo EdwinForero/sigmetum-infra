@@ -1,6 +1,5 @@
 module "networking" {
-  source      = "../../modules/networking"
-  environment = "dev"
+  source = "../../modules/networking"
 }
 
 # Single instance — no ALB, saves ~€17/month vs prod

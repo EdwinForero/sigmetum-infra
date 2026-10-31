@@ -1,10 +1,12 @@
 variable "environment" {
-  type = string
+  description = "Deployment environment: dev or prod. Forms the app name and the branch stage."
+  type        = string
 }
 
 variable "app_name" {
-  type    = string
-  default = "sigmetum-frontend"
+  description = "Prefix of the Amplify app name; the app is named <app_name>-<environment>."
+  type        = string
+  default     = "sigmetum-frontend"
 }
 
 variable "repository" {

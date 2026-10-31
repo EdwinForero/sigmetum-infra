@@ -1,5 +1,6 @@
 variable "environment" {
-  type = string
+  description = "Deployment environment: dev or prod. Forms the Beanstalk application and environment names."
+  type        = string
 }
 
 variable "enable_cdn" {
@@ -15,33 +16,39 @@ variable "solution_stack_name" {
 }
 
 variable "instance_type" {
-  type    = string
-  default = "t3.nano"
+  description = "EC2 instance type of the Beanstalk instances."
+  type        = string
+  default     = "t3.nano"
 }
 
 variable "min_instances" {
-  type    = number
-  default = 1
+  description = "Minimum number of instances in the Auto Scaling group."
+  type        = number
+  default     = 1
 }
 
 variable "max_instances" {
-  type    = number
-  default = 3
+  description = "Maximum number of instances in the Auto Scaling group."
+  type        = number
+  default     = 3
 }
 
 variable "vpc_id" {
-  type = string
+  description = "ID of the VPC where the environment is deployed."
+  type        = string
 }
 
 variable "subnet_ids" {
-  type = list(string)
+  description = "Subnets for the instances and the load balancer."
+  type        = list(string)
 }
 
 # "single" = no LB (dev, saves ~€17/month)
 # "application" = ALB with auto scaling (prod)
 variable "load_balancer_type" {
-  type    = string
-  default = "application"
+  description = "'single' (no load balancer, dev) or 'application' (ALB with auto scaling, prod)."
+  type        = string
+  default     = "application"
 
   validation {
     condition     = contains(["single", "application"], var.load_balancer_type)
@@ -69,12 +76,20 @@ variable "ssh_allowed_cidrs" {
 }
 
 variable "notification_email" {
-  type = string
+  description = "Email address that receives the SNS notifications of the environment."
+  type        = string
 }
 
 variable "app_env_vars" {
-  description = "Application environment variables passed to the Node.js process."
+  description = "Application environment variables passed to the Node.js process. Must define every key the backend requires at startup; extra keys are allowed."
   type        = map(string)
   sensitive   = true
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for key in ["JWT_SECRET", "JWT_EXPIRATION", "ADMIN_USERNAME", "ADMIN_PASSWORD", "EMAIL", "EMAIL_PASSWORD", "AWS_REGION", "AWS_BUCKET_NAME", "ALLOWED_ORIGIN"] : contains(keys(var.app_env_vars), key)
+    ])
+    error_message = "app_env_vars must define the keys the backend requires at startup: JWT_SECRET, JWT_EXPIRATION, ADMIN_USERNAME, ADMIN_PASSWORD, EMAIL, EMAIL_PASSWORD, AWS_REGION, AWS_BUCKET_NAME and ALLOWED_ORIGIN."
+  }
 }

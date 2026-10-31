@@ -53,7 +53,7 @@ cache:     node_modules/**/*
 | `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` del entorno: URL de CloudFront de `storage` (`module.storage.cdn_url`) en `dev` y `prod` |
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` (por defecto vacío) |
-| `NODE_ENV` | App | `dev` o `prod` |
+| `NODE_ENV` | App | `dev` o `prod`. Valor no estándar que no afecta a la compilación en `dev` (M2 cerrado; el módulo no cambia); efecto en `prod` **(por confirmar)** |
 
 **(verificado en rama `feature/testing` de infra).** El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
 
