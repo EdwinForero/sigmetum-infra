@@ -24,3 +24,7 @@ Thumbs.db
 
 # Claude Code: settings.json (shared, versioned) stays; local overrides don't
 .claude/settings.local.json
+
+# Understand-Anything: derived, regenerable code graph
+.understand-anything/
+.ua/

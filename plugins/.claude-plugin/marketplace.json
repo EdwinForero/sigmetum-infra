@@ -1,0 +1,27 @@
+{
+  "name": "locales-infra",
+  "description": "Marketplace local del repositorio de infraestructura: el núcleo ciclo-agentico y las skills de Terraform y AWS, categorizadas por perfil.",
+  "owner": {
+    "name": "EdwinForero"
+  },
+  "plugins": [
+    {
+      "name": "ciclo-agentico",
+      "source": "./ciclo-agentico",
+      "description": "Ciclo agéntico con roles y puertas de aprobación para desarrollar con agentes de forma controlada.",
+      "tags": ["perfil:base"]
+    },
+    {
+      "name": "terraform-general",
+      "source": "./terraform-general",
+      "description": "Skills generales de Terraform que se usan siempre: cambio de módulos, de variables y outputs, contrato con otros repositorios y lista previa a un apply.",
+      "tags": ["perfil:terraform"]
+    },
+    {
+      "name": "dominio-aws",
+      "source": "./dominio-aws",
+      "description": "Skills específicas del dominio AWS: revisión de IAM, S3, secretos, red y TLS, y cambios de Amplify.",
+      "tags": ["perfil:aws"]
+    }
+  ]
+}

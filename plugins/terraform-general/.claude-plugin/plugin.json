@@ -1,0 +1,8 @@
+{
+  "name": "terraform-general",
+  "version": "0.1.0",
+  "description": "Skills generales de Terraform que se usan siempre: cambio de módulos, de variables y outputs, revisión del contrato con otros repositorios y lista previa a un apply.",
+  "author": {
+    "name": "EdwinForero"
+  }
+}

@@ -1,0 +1,107 @@
+{
+  "guias": [
+    "docs/guias/buenas-practicas-terraform.md",
+    "docs/guias/seguridad.md",
+    "docs/guias/mantenimiento.md"
+  ],
+  "integracion": [
+    "docs/integracion/para-frontend.md",
+    "docs/integracion/para-backend.md"
+  ],
+  "skillsProyecto": [
+    "plugins/terraform-general/skills",
+    "plugins/dominio-aws/skills"
+  ],
+  "marketplaceLocal": "plugins",
+  "estado": "docs/estado-y-deuda-tecnica.md",
+  "estadoFecha": "Última actualización: (\\d{2}/\\d{2}/\\d{4})",
+  "verificacion": {
+    "fmt": "terraform fmt -check -recursive",
+    "validate:dev": "cd environments/dev && terraform init -backend=false && terraform validate",
+    "validate:prod": "cd environments/prod && terraform init -backend=false && terraform validate",
+    "quality": "node scripts/quality-check.mjs",
+    "docs:check": "node scripts/docs-check.mjs",
+    "docs:gate": "node plugins/ciclo-agentico/scripts/docs-gate.mjs",
+    "agentes:test": "node --test \"plugins/**/tests/**/*.test.mjs\""
+  },
+  "docsRegla": "docs/guias/mantenimiento.md",
+  "specsDir": "docs/specs",
+  "maxVueltas": 3,
+  "consultor": "ninguno",
+  "estilo": "ninguno",
+  "perfiles": [
+    "base",
+    "terraform",
+    "aws"
+  ],
+  "criticidad": [
+    "IAM y permisos",
+    "secretos y terraform.tfvars",
+    "red y TLS",
+    "estado remoto",
+    "bucket de datos (versionado, bloqueo, prevent_destroy)",
+    "contrato con el frontend y el backend (VITE_*, build_spec, app_env_vars)",
+    "CI",
+    "cualquier cambio que implique un apply"
+  ],
+  "docsObligatorios": [
+    "docs/estado-y-deuda-tecnica.md"
+  ],
+  "docsPorArea": {
+    "modules/**": [
+      "docs/referencia-modulos.md"
+    ],
+    "modules/amplify/**": [
+      "docs/referencia-modulos.md",
+      "docs/integracion/para-frontend.md"
+    ],
+    "modules/storage/**": [
+      "docs/referencia-modulos.md",
+      "docs/integracion/para-frontend.md",
+      "docs/integracion/para-backend.md"
+    ],
+    "modules/beanstalk/**": [
+      "docs/referencia-modulos.md",
+      "docs/integracion/para-backend.md",
+      "README.md"
+    ],
+    "modules/dns/**": [
+      "docs/referencia-modulos.md",
+      "README.md"
+    ],
+    "modules/backend-ci-iam/**": [
+      "docs/referencia-modulos.md",
+      "docs/iam-role-setup.md"
+    ],
+    "environments/**": [
+      "docs/referencia-modulos.md",
+      "README.md"
+    ],
+    "environments/*/terraform.tfvars.example": [
+      "docs/referencia-modulos.md"
+    ],
+    "scripts/**": [
+      "docs/guias/mantenimiento.md"
+    ],
+    ".github/**": [
+      "docs/guias/mantenimiento.md"
+    ],
+    ".claude/**": [
+      "docs/guias/mantenimiento.md"
+    ],
+    "plugins/**": [
+      "plugins/README.md"
+    ]
+  },
+  "areasContrato": [
+    "modules/amplify/**",
+    "modules/storage/**",
+    "modules/beanstalk/**",
+    "modules/dns/**",
+    "environments/**/variables.tf",
+    "environments/**/main.tf",
+    "environments/**/*.example",
+    ".github/**"
+  ],
+  "avisoPR": "docs/specs/*-aviso-pr.md"
+}

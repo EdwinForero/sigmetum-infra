@@ -1,0 +1,8 @@
+{
+  "name": "dominio-aws",
+  "version": "0.1.0",
+  "description": "Skills específicas del dominio AWS: revisión de IAM, S3, secretos, red y TLS, y cambios de Amplify.",
+  "author": {
+    "name": "EdwinForero"
+  }
+}

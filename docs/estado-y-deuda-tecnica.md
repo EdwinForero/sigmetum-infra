@@ -2,7 +2,7 @@
 
 Registro de hallazgos de `sigmetum-infra`, con su referencia cruzada al frontend y al backend. Es el **único** documento que contiene cifras del repositorio (ver [mantenimiento.md](guias/mantenimiento.md#1-la-regla)).
 
-- Fecha de la revisión: 30/09/2026 (inicial). Última actualización: 04/10/2026, rama `feature/testing`, commit `be447a0`.
+- Fecha de la revisión: 30/09/2026 (inicial). Última actualización: 30/10/2026, rama `feature/testing`, commit base `c29cb57`.
 - Contrastado con: `sigmetum-frontend` (`docs/integracion/para-infra.md`, `.env.example`) y `sigmetum-backend` (rama `feature/sigmetum_v2`: `config/validateEnv.js`, `index.js`, `docs/integracion/para-infra.md`).
 - Ningún `.tf` se ha modificado para esta revisión. Los `terraform.tfvars` reales no se han leído: solo se comprobaron los **nombres** de las claves del de `dev`.
 - **(verificado)** = comprobado contra el código de este repositorio o de los hermanos. **(por confirmar)** = depende de la cuenta real de AWS o de un entorno desplegado.
@@ -87,3 +87,9 @@ Los marcados con † están en la rama `feature/testing`; los demás ya están e
 | **C12** | El rate-limiter agrupaba intentos de login por la IP del balanceador | `app.set('trust proxy', 1)` añadido en `index.js` del backend (03/10/2026) |
 | **M8** † | `aws_amplify_branch` no llevaba la etiqueta `Component` | `tags { Component = "frontend" }` añadido en `modules/amplify/main.tf`; entrada eliminada de `KNOWN_DEBT` en `quality-check.mjs` |
 | **B1** | `INTEGRACION.md` (raíz) estaba sin confirmar y su enlace de GitHub solo funcionaría al fusionar el frontend | **No procede:** el archivo se eliminó por redundante; los punteros a los documentos de los repositorios hermanos (con la salvedad del enlace de GitHub, por confirmar) están en [mantenimiento.md](guias/mantenimiento.md#31-dónde-vive-cada-cosa) |
+
+## Iteraciones
+
+| Fecha | Cambio | Pendiente |
+|---|---|---|
+| 30/10/2026 | Flujo agéntico `ciclo-agentico` llevado desde el repositorio del backend: núcleo copiado sin cambios en `plugins/ciclo-agentico/`, marketplace local `locales-infra` con los plugins `terraform-general` y `dominio-aws`, `.claude/flujo.json`, permisos `ask` de git en `.claude/settings.json` (sin tocar los `deny`) y sección "Ciclo de desarrollo" de [CLAUDE.md](../CLAUDE.md). Ningún `.tf` modificado; `quality-check` y `docs-check` no escanean `plugins/` | Añadir `docs:gate` y las pruebas de `plugins/` a la plantilla de PR y, solo `--solo-validar`, a la CI (a decisión del responsable). Por confirmar: `claude plugin marketplace add ./plugins` y el prefijo `/ciclo-agentico:ciclo` |

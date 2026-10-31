@@ -1,0 +1,28 @@
+{
+  "$comentario": "Valores de EJEMPLO: /ciclo-init los sustituye por los del proyecto. Las claves que empiezan por $ se ignoran. La clave test de verificacion solo debe existir si el proyecto tiene una base de tests real: el developer aplica TDD solo cuando existe.",
+  "guias": ["docs/guias/normas.md"],
+  "integracion": ["docs/integracion/contrato-cliente.md"],
+  "skillsProyecto": ["plugins/mi-dominio/skills"],
+  "marketplaceLocal": "plugins",
+  "estado": "docs/estado.md",
+  "estadoFecha": "actualizado (\\d{2}/\\d{2}/\\d{4})",
+  "verificacion": {
+    "test": "npm test",
+    "docs-gate": "node ruta/al/plugin/scripts/docs-gate.mjs"
+  },
+  "docsRegla": "docs/guias/documentacion.md",
+  "specsDir": "docs/specs",
+  "maxVueltas": 3,
+  "consultor": "ninguno",
+  "estilo": "ninguno",
+  "perfiles": ["base"],
+  "criticidad": ["autenticación", "dependencias", "contratos con otros repositorios", "CI"],
+  "docsObligatorios": ["docs/estado.md"],
+  "docsPorArea": {
+    "src/**": ["docs/modulos.md"],
+    "src/api/**": ["docs/api.md", "docs/modulos.md"],
+    "package.json": ["docs/tecnologias.md"]
+  },
+  "areasContrato": ["src/api/**"],
+  "avisoPR": "docs/specs/*-aviso-pr.md"
+}

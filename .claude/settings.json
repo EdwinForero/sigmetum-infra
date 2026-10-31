@@ -18,6 +18,17 @@
       "Read(environments/*/terraform.tfvars)",
       "Read(**/*.tfstate)",
       "Read(**/*.tfstate.backup)"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git stash:*)",
+      "PowerShell(git commit *)",
+      "PowerShell(git push *)",
+      "PowerShell(git add *)",
+      "PowerShell(git stash *)"
     ]
-  }
+  },
+  "autoMemoryEnabled": false
 }

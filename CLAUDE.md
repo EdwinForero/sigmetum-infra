@@ -8,6 +8,8 @@ Infraestructura de SIGMETUM-A con Terraform (Beanstalk, Amplify, S3, Route53). D
 - `terraform init -backend=false` y `terraform validate`: en `environments/dev` y `environments/prod`
 - `node scripts/quality-check.mjs`: puerta de calidad y seguridad (formato, validación, reglas de los `.tf`, secretos, coherencia con los otros repositorios)
 - `node scripts/docs-check.mjs`: comprueba que la documentación no se ha quedado atrás (`--metrics`, `--strict`)
+- `node plugins/ciclo-agentico/scripts/docs-gate.mjs`: cierre documental del ciclo agéntico; compara los cambios sin commitear con `.claude/flujo.json` (`--solo-validar` solo valida ese archivo). Se ejecuta en local antes del commit
+- `node --test "plugins/**/tests/**/*.test.mjs"`: pruebas de `plugins/` (núcleo `ciclo-agentico` y marketplace local); no son pruebas de la infraestructura
 
 ## Prohibido sin confirmación expresa
 
@@ -26,6 +28,17 @@ Las guías están en `docs/guias/`. Léelas **antes** de escribir código, no de
 | **Al terminar** cualquier cambio | `docs/guias/mantenimiento.md` |
 
 Si lo que te piden **contradice una guía, avisa y pregunta antes de hacerlo**. Si la guía y el código se contradicen, dilo: no des por buena ninguna de las dos.
+
+## Ciclo de desarrollo (ciclo-agentico)
+
+Los cambios con agentes pasan por `/ciclo <tarea>` (plugin [ciclo-agentico](plugins/ciclo-agentico/README.md); configuración en `.claude/flujo.json`, que se valida con `/ciclo-init`; plugins locales y cómo activarlos en [plugins/README.md](plugins/README.md)). Roles:
+
+- `requirements`: convierte la tarea en un borrador de spec en `docs/specs/`; no propone solución técnica.
+- `architect`: solo lee; entrega un plan por pasos contrastado con las guías y la integración, o un veto motivado.
+- `developer`: implementa el plan con el cambio mínimo; no edita documentos.
+- `tester-documentador`: ejecuta la verificación, pone los documentos al día y propone el mensaje de commit (en inglés); no edita código.
+
+Hay puerta humana tras requisitos, tras arquitectura y al final. **Ningún rol hace `terraform apply`, `destroy`, `plan`, `import` ni `state`, ni comandos de AWS que cambien recursos**: la verificación es `fmt`, `validate`, `quality-check`, `docs-check`, `docs-gate` y las pruebas de `plugins/`. Los roles heredan las reglas de `.claude/settings.json`. Nadie del ciclo hace commit, push ni `git add`: el commit lo haces tú tras la puerta final. Las specs, planes y avisos de `docs/specs/` siguen la misma regla de secretos que los documentos: solo marcadores y nombres de variables. Principios de trabajo: skill [principios](plugins/ciclo-agentico/skills/principios/SKILL.md). Las skills de dominio (procedimiento paso a paso; las normas siguen en las guías) están en [plugins/README.md](plugins/README.md).
 
 ## Integración con otros repositorios
 
@@ -62,6 +75,14 @@ En el resumen final di **qué deben hacer los otros repositorios y en qué orden
 3. Contrasta lo que escribas con el código; lo que no puedas comprobar (lo que hay desplegado en AWS), márcalo como **(por confirmar)**.
 4. Si tocas variables `VITE_*`, el `build_spec`, dominios, región, bucket o `app_env_vars`, revisa `../sigmetum-frontend/docs/integracion/para-infra.md` y `../sigmetum-backend/config/validateEnv.js` y deja indicado en el resumen qué debe hacer cada repositorio (sección 3 de `mantenimiento.md`).
 5. Las variables, outputs y claves de `app_env_vars` solo viven en `docs/referencia-modulos.md`; las cifras y los hallazgos, en `docs/estado-y-deuda-tecnica.md`. Una deuda nueva se anota allí y, si `quality-check` la tolera, en `KNOWN_DEBT`.
+
+## Cierre documental del ciclo
+
+Además de los cuatro comandos de "Al terminar cualquier cambio", si el cambio va por `/ciclo`:
+
+- Pon al día `docs/estado-y-deuda-tecnica.md`, con "Última actualización: DD/MM/AAAA" con la fecha de hoy.
+- Ejecuta `node plugins/ciclo-agentico/scripts/docs-gate.mjs` antes del commit (necesita los cambios sin commitear).
+- Si tocas `plugins/`, ejecuta también `node --test "plugins/**/tests/**/*.test.mjs"`.
 
 ## Reglas de trabajo
 

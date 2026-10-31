@@ -1,0 +1,44 @@
+{
+  "dependencias": [
+    {
+      "id": "superpowers@superpowers-marketplace",
+      "rol": "base",
+      "perfil": "base",
+      "marketplace": "obra/superpowers-marketplace"
+    },
+    {
+      "id": "understand-anything@understand-anything",
+      "rol": "complemento",
+      "perfil": "base",
+      "marketplace": "Egonex-AI/Understand-Anything"
+    },
+    {
+      "id": "diagram-design@diagram-design",
+      "rol": "complemento",
+      "perfil": "base",
+      "marketplace": "cathrynlavery/diagram-design"
+    },
+    {
+      "id": "i-have-adhd@i-have-adhd",
+      "rol": "estilo",
+      "perfil": "base",
+      "marketplace": "ayghri/i-have-adhd",
+      "revisado": { "version": "0.4.1", "commit": "1ecea19" }
+    },
+    {
+      "id": "octo@nyldn-plugins",
+      "rol": "consultor",
+      "perfil": "base",
+      "marketplace": "https://github.com/nyldn/claude-octopus.git",
+      "plataformas": ["linux", "darwin"],
+      "revisado": { "version": "11.15.1", "commit": "ee7bcb4" }
+    },
+    {
+      "id": "impeccable@impeccable",
+      "rol": "estilo-ui",
+      "perfil": "frontend",
+      "marketplace": "pbakaus/impeccable",
+      "porConfirmar": true
+    }
+  ]
+}

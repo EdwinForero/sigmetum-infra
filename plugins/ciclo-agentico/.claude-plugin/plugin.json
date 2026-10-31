@@ -1,0 +1,8 @@
+{
+  "name": "ciclo-agentico",
+  "version": "0.1.0",
+  "description": "Ciclo agéntico con roles y puertas de aprobación para desarrollar con agentes de forma controlada.",
+  "author": {
+    "name": "EdwinForero"
+  }
+}
