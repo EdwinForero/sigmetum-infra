@@ -53,7 +53,8 @@ cache:     node_modules/**/*
 | `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` del entorno: URL de CloudFront de `storage` (`module.storage.cdn_url`) en `dev` y `prod` |
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` (por defecto vacío) |
-| `NODE_ENV` | App | `dev` o `prod`. Valor no estándar que no afecta a la compilación en `dev` (M2 cerrado; el módulo no cambia); efecto en `prod` **(por confirmar)** |
+
+**`NODE_ENV` ya no se define (M2).** Efecto esperado: un bundle de unos 768 kB, frente a unos 1058 kB, sin `react-dom.development` ni el aviso de DevTools (comprobado en local con y sin la variable; Vite fija `production` en `vite build`). Estado: resuelto en código y pendiente del `apply` de `dev` y de la verificación; `prod` **(por confirmar)** hasta su primer despliegue. El frontend debe comprobar el rendimiento, que ningún componente dependa de avisos de desarrollo de React y que su CSP Report-Only y sus scripts no cambian. Su `para-infra.md` aún copia `NODE_ENV = var.environment` y debe actualizarse.
 
 **(verificado en rama `feature/testing` de infra).** El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
 

@@ -141,7 +141,8 @@ Variables de entorno que el módulo define en la app y en la rama. Se comparan c
 | `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` → `module.storage.cdn_url` (URL de CloudFront) |
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` |
-| `NODE_ENV` | App | `environment` |
+
+Amplify ya no define `NODE_ENV` (M2). Vite fija `production` en `vite build` y Vitest fija `test`. Fijar `production` en toda la app haría que `npm ci` omitiera las `devDependencies` (se perderían `vite` y `vitest`) y que Vitest usara el React de producción, donde `act` no funciona. Con `NODE_ENV=dev`, React elegía su build de desarrollo aunque Vite imprimiera «building for production».
 
 ## Módulo dns
 

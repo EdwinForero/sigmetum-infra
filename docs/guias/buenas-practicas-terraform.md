@@ -103,7 +103,7 @@ Lo que no se debe imitar y ya está registrado:
 | URL del backend en `http://` construida con el endpoint | `environments/dev/main.tf` | C4 |
 | Health check a `/` cuando la ruta de salud es `/healthcheck` | `modules/beanstalk/main.tf` | C6 |
 | Variable de entorno con el nombre equivocado para el frontend | `modules/amplify/main.tf` | C1 |
-| `NODE_ENV` con un valor no estándar (`dev`, `prod`): cerrado como «no afecta» a la compilación en `dev`; en `prod` **(por confirmar)** | `modules/amplify/main.tf` | M2 |
+| `NODE_ENV` ya no se define en Amplify (M2): resuelto en código, pendiente del `apply` de `dev` y de la verificación; `prod` por confirmar | `modules/amplify/main.tf` | M2 |
 | Nombre del rol de Beanstalk escrito a mano en el módulo de almacenamiento (acopla el módulo a un rol creado fuera de Terraform) | `modules/storage/main.tf` | M3, S7 |
 | `output` que construye una URL con `/` en el nombre de rama | `modules/amplify/outputs.tf` | C8 |
 | Secretos pasados como propiedades de entorno de Beanstalk | `modules/beanstalk/main.tf` | S6 |

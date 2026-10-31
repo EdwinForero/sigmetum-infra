@@ -71,7 +71,6 @@ resource "aws_amplify_app" "this" {
     VITE_API_PREFIX          = "/api/v1"
     VITE_S3_URL              = var.s3_url
     VITE_CAROUSEL_IMAGE_KEYS = var.carousel_image_keys
-    NODE_ENV                 = var.environment
   }
 
   # Let hashed static assets pass through
