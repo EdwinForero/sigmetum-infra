@@ -17,7 +17,7 @@ Documento para quien mantiene `sigmetum-frontend`. Convención y estructura en [
 | **infra:C7** (= `frontend:I7`) | Nada sube `assets/…` al bucket | Faltan logos y banner; con `VITE_S3_URL` de `prod` ya apuntando a CloudFront, `prod` da 403/404 en favicon y logos hasta resolverlo (riesgo aceptado; infra avisará) | Abierto |
 | **infra:C8** | `branch_url` no sustituía `/` por `-` en el nombre de rama | El origen real de `dev` no era el que calculaba el output | **Resuelto**: `replace(var.branch, "/", "-")` **(verificado)** |
 | **infra:C9** (parte de `frontend:I4`) | Falta el dominio del frontend en prod (`modules/dns` solo crea `backend.<zona>`) | No hay `ALLOWED_ORIGIN` de prod para el backend | Abierto |
-| **infra:C10** | El `build_spec` no fijaba Node ni ejecutaba `npm test` | Riesgo de compilar con otra versión o desplegar una build rota | **Resuelto en código** (Node 22 con `nvm` y `npm test` en `preBuild`); efecto en Amplify **(por confirmar)** hasta el `apply` |
+| **infra:C10** | El `build_spec` no fijaba Node ni ejecutaba `npm test` | Riesgo de compilar con otra versión o desplegar una build rota | **Resuelto en código** (Node 22 con `nvm` y `npm test` en `preBuild`); **verificado en `dev`** (build #7, 30/10/2026: Node 22, 134 tests en verde y build correcto); `prod` **(por confirmar)**, sin aplicar ni comprobar desde aquí |
 | **infra:C11** | Sin cabeceras de caché ni CSP en Amplify | Sección 6 de `para-infra.md` del frontend | Abierto |
 | **infra:C14** (= `frontend:I3`, `backend:F16`) | En el Amplify de `dev`, `/explorar` responde `301` a `/explorar/` y luego `404` aunque las dos `custom_rule` estaban aplicadas | Recargar o abrir un enlace directo a una ruta de la SPA falla | **Resuelto en código** (`source` de la regla SPA en `</regex/>`); **verificado en `dev`** tras el `apply` (30/10/2026): `/explorar`, `/explorar/` y una ruta anidada dan `200` sin `301`; `prod` **(por confirmar)**, sin aplicar ni comprobar desde aquí. Se reabre si `/explorar` sigue dando `301` o `404` |
 
@@ -43,7 +43,7 @@ artifacts: dist (**/*)
 cache:     node_modules/**/*
 ```
 
-**(verificado en `modules/amplify/main.tf`).** Fija Node 22 con `nvm` en `preBuild` y ejecuta `npm test` justo después de `npm ci` (infra:C10): **si los tests fallan, Amplify no despliega**. Intención: migrar a Node 24 más adelante; infra cambiará el `build_spec` y avisará. **(Por confirmar)**: que la imagen de Amplify traiga Node 22 (si no, `nvm install 22` añade tiempo y exige red en el build) y que `nvm use` persista entre los comandos de `preBuild`.
+**(verificado en `modules/amplify/main.tf`).** Fija Node 22 con `nvm` en `preBuild` y ejecuta `npm test` justo después de `npm ci` (infra:C10): **si los tests fallan, Amplify no despliega**. Intención: migrar a Node 24 más adelante; infra cambiará el `build_spec` y avisará. **Verificado en `dev` (build #7, 30/10/2026, log del paso BUILD):** `nvm install 22` descarga e instala Node v22 en el propio build (necesita red, y añade unos segundos), `nvm use` persiste entre los comandos de `preBuild`, y `npm test` corre `vitest run` (22 ficheros, 134 tests en verde, sin modo watch). **(Por confirmar)** en `prod`, sin aplicar ni comprobar desde aquí.
 
 ### Variables de entorno que Amplify define hoy
 
