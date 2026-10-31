@@ -1,3 +1,7 @@
+locals {
+  https_enabled = var.load_balancer_type == "application" && var.ssl_certificate_arn != ""
+}
+
 resource "aws_elastic_beanstalk_application" "this" {
   name = "sigmetum-backend-${var.environment}"
 
@@ -160,7 +164,7 @@ resource "aws_elastic_beanstalk_environment" "this" {
 
   # HTTPS listener — only when ALB + cert provided
   dynamic "setting" {
-    for_each = var.load_balancer_type == "application" && var.ssl_certificate_arn != "" ? {
+    for_each = local.https_enabled ? {
       ListenerEnabled    = "true"
       Protocol           = "HTTPS"
       SSLCertificateArns = var.ssl_certificate_arn
@@ -302,6 +306,40 @@ resource "aws_elastic_beanstalk_environment" "this" {
   # Ignore platform patch updates (AWS bumps minor versions automatically)
   lifecycle {
     ignore_changes = [solution_stack_name]
+  }
+}
+
+# ── HTTP → HTTPS redirect (only when ALB + cert provided) ─────────────────────
+# The port-80 listener is created by Beanstalk; a rule is added to it instead of importing it.
+data "aws_lb_listener" "http" {
+  count             = local.https_enabled ? 1 : 0
+  load_balancer_arn = aws_elastic_beanstalk_environment.this.load_balancers[0]
+  port              = 80
+}
+
+resource "aws_lb_listener_rule" "http_to_https" {
+  count        = local.https_enabled ? 1 : 0
+  listener_arn = data.aws_lb_listener.http[0].arn
+  priority     = 1
+
+  action {
+    type = "redirect"
+
+    redirect {
+      port        = "443"
+      protocol    = "HTTPS"
+      status_code = "HTTP_301"
+    }
+  }
+
+  condition {
+    path_pattern {
+      values = ["/*"]
+    }
+  }
+
+  tags = {
+    Component = "backend"
   }
 }
 

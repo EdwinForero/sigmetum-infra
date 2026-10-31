@@ -4,6 +4,10 @@ resource "aws_s3_bucket" "app" {
   tags = {
     Component = "storage"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "aws_s3_bucket_versioning" "app" {
@@ -12,6 +16,38 @@ resource "aws_s3_bucket_versioning" "app" {
   versioning_configuration {
     status = "Enabled"
   }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "app" {
+  bucket = aws_s3_bucket.app.id
+
+  rule {
+    id     = "expire-noncurrent-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 180
+    }
+
+    expiration {
+      expired_object_delete_marker = true
+    }
+  }
+
+  rule {
+    id     = "abort-incomplete-multipart"
+    status = "Enabled"
+
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.app]
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "app" {
@@ -85,20 +121,37 @@ resource "aws_s3_bucket_policy" "cloudfront_oac" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Sid    = "AllowCloudFrontOAC"
-      Effect = "Allow"
-      Principal = {
-        Service = "cloudfront.amazonaws.com"
-      }
-      Action   = "s3:GetObject"
-      Resource = "${aws_s3_bucket.app.arn}/*"
-      Condition = {
-        StringEquals = {
-          "AWS:SourceArn" = aws_cloudfront_distribution.app.arn
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontOAC"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.app.arn}/assets/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.app.arn
+          }
+        }
+      },
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          aws_s3_bucket.app.arn,
+          "${aws_s3_bucket.app.arn}/*"
+        ]
+        Condition = {
+          Bool = {
+            "aws:SecureTransport" = "false"
+          }
         }
       }
-    }]
+    ]
   })
 }
 
@@ -108,18 +161,31 @@ resource "aws_iam_role_policy" "beanstalk_s3" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [{
-      Effect = "Allow"
-      Action = [
-        "s3:GetObject",
-        "s3:PutObject",
-        "s3:DeleteObject",
-        "s3:ListBucket"
-      ]
-      Resource = [
-        aws_s3_bucket.app.arn,
-        "${aws_s3_bucket.app.arn}/*"
-      ]
-    }]
+    Statement = [
+      {
+        Sid    = "ObjectsInGalleryAndData"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.app.arn}/gallery/*",
+          "${aws_s3_bucket.app.arn}/data/*"
+        ]
+      },
+      {
+        Sid      = "ListGalleryAndData"
+        Effect   = "Allow"
+        Action   = "s3:ListBucket"
+        Resource = aws_s3_bucket.app.arn
+        Condition = {
+          StringLike = {
+            "s3:prefix" = ["gallery/*", "data/*"]
+          }
+        }
+      }
+    ]
   })
 }

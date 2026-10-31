@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios). El backend no tiene un documento `para-infra.md` equivalente: su contrato con esta infraestructura es `config/validateEnv.js`, `config/trustProxy.js`, `app.js` y `aws/awsS3connect.js`, que se citan aquí.
 
 - Lo verificado contra el código de Terraform y del backend está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 30/09/2026 (actualizado 30/10/2026). Infraestructura: rama `feature/testing`, commit base `d3866f5` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `ea19315`.
+- Fecha de la verificación: 30/09/2026 (actualizado 30/10/2026, seguridad del bucket). Infraestructura: rama `feature/testing`, commit base `d3866f5` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `ea19315`.
 
 ## 1. Resumen
 
@@ -13,6 +13,7 @@ Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [m
 | ~~**infra:C6**~~ | ~~`HealthCheckPath` de Beanstalk es `/`~~ | ~~El entorno puede figurar como no saludable~~ | **Resuelto** (`feature/testing` de infra): `HealthCheckPath = "/healthcheck"` **(verificado)** |
 | ~~**backend:B1**~~ | ~~El backend no configuraba `trust proxy`~~ | ~~IP del balanceador compartida por todos los usuarios en el rate-limiter~~ | **Resuelto (03/10/2026)**: `app.set('trust proxy', ...)` en `app.js`, con los saltos fijados por `TRUST_PROXY_HOPS` (1 si no se define) **(verificado)** |
 | **backend:I7** | `TRUST_PROXY_HOPS` no está en `app_env_vars`: el backend usa 1 salto por defecto | Si los saltos reales difieren, el limitador de intentos agrupa mal las IP o se esquiva con `X-Forwarded-For` | **Abierto (prioridad alta)**: infra mide los saltos y la fija en `app_env_vars` **antes de que el backend despliegue la entrega 2 de M21** (`POST /send-email` pública; condición del backend en su `para-infra.md`, sección 6) (no es `frontend:I7`) |
+| **infra:S15** (dependencia del `apply`) | El backend no trata `AccessDenied` en `data/terms/noLatinTerms.json` ni en `GET /get-data/:path(*)` | Tras acotar `s3:ListBucket` por `Prefix` (infra:S7), una clave inexistente probablemente da 403 `AccessDenied` y no 404 `NoSuchKey` **(por confirmar en dev)**: `GET /list-terms` y la primera alta de término fallarían con 500 si el archivo no existe | **Abierto, tarea del backend** (ver sección 5): tratar `AccessDenied` y desplegar **antes** del `apply` de infra |
 
 ## 2. Contrato de entorno: `app_env_vars` frente a `validateEnv.js`
 
@@ -60,17 +61,51 @@ Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las clav
 
 **(verificado en `environments/*/main.tf` y `modules/dns/main.tf`).**
 
+En `prod`, con ALB y certificado, el listener 80 redirige con 301 a HTTPS (443) (`aws_lb_listener_rule.http_to_https`, `modules/beanstalk/main.tf`, verificado en código; efecto **(por confirmar)** tras el `apply` en prod). Afecta a todo cliente HTTP, no solo al navegador; en `dev` no cambia.
+
 ### Cabeceras `X-Forwarded-*` y `trust proxy`
 
 El ALB de prod (y CloudFront en dev) añaden `X-Forwarded-For` y `X-Forwarded-Proto` a las peticiones. El backend configura `app.set('trust proxy', ...)` en `app.js` **(B1 resuelto, 03/10/2026)** con el número de saltos de `TRUST_PROXY_HOPS` (opcional; 1 si no se define; entero de 1 a 5, el 0 solo con `NODE_ENV` `local` o `test`, `config/trustProxy.js`, verificado): Express y el limitador de `express-rate-limit` leen la IP real del cliente. Infra no fija hoy la variable y el recuento real de saltos de cada entorno no está medido: `backend:I7` abierto (**por confirmar**).
 
 ## 5. Permisos IAM de S3
 
-La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role` da `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` y `s3:ListBucket` sobre el bucket completo y sus objetos (`modules/storage/main.tf`, verificado).
+La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role` tiene dos sentencias (`modules/storage/main.tf`, verificado en código; efecto aplicado **(por confirmar)** hasta el `apply`):
 
-`aws/awsS3connect.js` del backend usa `GetObjectCommand`, `PutObjectCommand` (vía `s3.putObject`), `DeleteObjectCommand` (vía `s3.deleteObject`) y `ListObjectsV2Command` (verificado): las cuatro acciones que concede la política. No usa ninguna acción adicional (sin `PutObjectAcl`, sin operaciones multipart).
+| Sentencia | Acciones | Recurso | Condición |
+|---|---|---|---|
+| `ObjectsInGalleryAndData` | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `gallery/*` y `data/*` del bucket del entorno | — |
+| `ListGalleryAndData` | `s3:ListBucket` | El bucket | `StringLike` en `s3:prefix`: `gallery/*` o `data/*` |
 
-**No es mínimo privilegio a nivel de prefijo:** el rol puede escribir y borrar en cualquier ruta del bucket, incluida `assets/…` (recursos públicos del frontend), aunque el backend solo opera sobre `gallery/`, `data/`, `data/active/`, `data/terms/` y `data/drafts/` (`config/s3Paths.js`, verificado). La política cubre todo el bucket, así que estos prefijos no exigen **ningún cambio de permisos**. Ver [S7](../estado-y-deuda-tecnica.md#abiertos).
+**Prefijos efectivos que debe respetar el backend:** `gallery/` y `data/` (esto cubre `data/active/`, `data/terms/`, `data/drafts/` y `data/<provincia>/`; `config/s3Paths.js`, verificado). **Sin acceso** para el rol a `assets/`, a la raíz del bucket ni a ningún otro prefijo: esos accesos darán acceso denegado. `assets/*` queda solo para CloudFront.
+
+**Regla del listado:** todo `listObjectsV2` debe llevar `Prefix` con barra final dentro de `gallery/` o `data/`. Un listado sin `Prefix`, de la raíz o con `data` o `gallery` sin barra se deniega. Hoy solo hay un punto que lista, `listAllObjects` (`aws/awsS3connect.js`), y su `Prefix` siempre lleva barra final porque `listFilesInS3Folder` y `getPresignedUrlsFromS3Folder` lo normalizan (verificado). Llamadores:
+
+| Llamador | Prefix enviado | Dentro de `gallery/` o `data/` |
+|---|---|---|
+| `getPresignedUrlsFromS3Folder` desde `routes/content.js:70` | `gallery/` | Sí |
+| `listFilesInS3Folder` desde `routes/data.js:63` (`list-files`) | `data/` | Sí |
+| `getMergedDataInS3Folder` desde `routes/data.js:93` | `data/active/` | Sí |
+| `listFilesInS3Folder` desde `routes/data.js:44, 144, 200` | `data/<provincia>/` | Sí |
+| `listFilesInS3Folder` desde `routes/data.js:53, 184` | `data/drafts/<provincia>/` | Sí |
+
+Las URL prefirmadas se firman con el rol de instancias, así que la lectura de `gallery/` y `data/` sigue permitida. Usa las acciones `GetObjectCommand`, `PutObjectCommand` (vía `s3.putObject`), `DeleteObjectCommand` (vía `s3.deleteObject`) y `ListObjectsV2Command` (verificado); sin `PutObjectAcl` ni multipart.
+
+**Un prefijo nuevo exige cambiar la política de infra antes** de que el backend lo use: si no, falla con acceso denegado.
+
+**Nota 403 frente a 404 (por confirmar en dev):** S3 devuelve 404 `NoSuchKey` para una clave inexistente solo si quien llama tiene `s3:ListBucket` sin una condición que impida evaluarlo; `GetObject` no lleva `s3:prefix`, así que con el listado condicionado probablemente devuelva 403 `AccessDenied`. Hoy el backend no lo trata (verificado): `getTextJsonS3` (`aws/awsS3connect.js`) solo devuelve lista vacía con `NoSuchKey`, y el `errorHandler` responde 500 salvo `NoSuchKey` (404). Afecta a `GET /list-terms`, a la alta de término (`uploadTextToJsonS3`) y a `GET /get-data/<clave inexistente>`.
+
+**Tarea para el backend (decisión del usuario, fuera de este ciclo; infra:S15):** tratar `AccessDenied` además de `NoSuchKey` en `data/terms/noLatinTerms.json` (lista vacía) y en `GET /get-data/:path(*)` (404 o error controlado). Conviene también validar la clave de `GET /get-data/:path(*)` con `isValidDataKey` (hoy pasa `req.params.path` a `getObject` sin acotar).
+
+**Orden de despliegue:** el **backend se despliega ANTES del `apply` de infra**. Mitigación temporal si no puede ser: subir antes un `data/terms/noLatinTerms.json` con `[]` a dev y a prod, con el perfil de cada cuenta (marcadores, sin valores reales):
+
+```bash
+echo '[]' > noLatinTerms.json
+aws s3 cp noLatinTerms.json s3://<bucket>/data/terms/noLatinTerms.json --profile <perfil-de-la-cuenta>
+```
+
+Esta mitigación solo cubre `noLatinTerms.json`, no `GET /get-data/<clave inexistente>`. Ver [S7 y S15](../estado-y-deuda-tecnica.md).
+
+**TLS y redirección:** el bucket deniega toda petición sin TLS (`aws:SecureTransport`); el SDK usa HTTPS por defecto, así que no cambia nada. En `prod`, tras el `apply`, el listener 80 del ALB redirige con 301 a HTTPS (443) para **todo** cliente HTTP; `app_env_vars` no cambia y el health check (grupo de destino, puerto 80 de la instancia) no pasa por el listener **(por confirmar)**.
 
 ## 6. Plataforma, tamaño de instancia y correo saliente
 
@@ -100,7 +135,7 @@ Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue): `ALLOWED_ORIGIN`
 |---|---|---|---|---|
 | **B1** | ~~Sin `trust proxy`, el límite de intentos de login puede agruparse por la IP del balanceador~~ | `../sigmetum-backend/app.js` | backend | **Resuelto (04/10/2026):** `trust proxy` añadido en commit `7748a1c`; hoy en `app.js`, con `TRUST_PROXY_HOPS` |
 | **backend:I7** | `TRUST_PROXY_HOPS` sin fijar en `app_env_vars` (1 salto por defecto) | `modules/beanstalk/main.tf` | infra y backend | Infra mide los saltos de cada entorno y fija la variable. **Condición del backend:** es obligatorio **antes de desplegar la entrega 2 de M21** (`POST /send-email` pública); origen: `sigmetum-backend/docs/integracion/para-infra.md`, sección 6 (límite de `POST /send-email`) y fila I7 de la tabla de discrepancias. El backend no cambia código, pero no debe desplegar esa entrega hasta que infra lo confirme |
-| **B2** | La política IAM de S3 da escritura y borrado sobre todo el bucket, más permiso del que usa el código | `modules/storage/main.tf` | infra | Limitar a los prefijos de `config/s3Paths.js` (también registrado como [S7](../estado-y-deuda-tecnica.md#abiertos)) |
+| **B2** | ~~La política IAM de S3 da escritura y borrado sobre todo el bucket~~ | `modules/storage/main.tf` | infra | **Resuelto en código (30/10/2026), dependiente de infra:S7:** la política se limita a `gallery/*` y `data/*` (sección 5). Efecto aplicado **(por confirmar)**; el backend debe tratar `AccessDenied` antes del `apply` (infra:S15) |
 | **B3** | ~~`package.json` del backend no fija `engines.node`~~  | `../sigmetum-backend/package.json` | backend | **Resuelto (03/10/2026):** `"engines": { "node": "22" }` añadido |
 
 ## 9. CI: despliegue automático desde GitHub Actions
@@ -148,7 +183,8 @@ El bucket de staging lo deriva el workflow del account ID al correr (`elasticbea
 | Una clave de `app_env_vars` | Sección 2 | PR: qué clave, en qué entorno (solo nombres) |
 | `HealthCheckPath` u otro ajuste de Beanstalk | Sección 3 | PR |
 | El ALB, el certificado o el DNS | Sección 4 | PR: nuevo dominio o URL |
-| La política IAM de `modules/storage` | Sección 5 | PR: qué acciones o prefijos cambian |
+| La política IAM de `modules/storage` | Sección 5 (y B2 de la sección 8) | PR: qué acciones o prefijos cambian |
+| El listener 80 del ALB o la redirección a HTTPS | Secciones 4 y 5 | PR: efecto en clientes HTTP |
 | El tipo de instancia | Sección 6 | PR: motivo (coste o capacidad) |
 | `modules/backend-ci-iam` (rol, bucket, permisos) | Sección 9 | PR: qué cambió y si hay que actualizar variables en GitHub |
 

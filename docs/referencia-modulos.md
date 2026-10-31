@@ -56,9 +56,20 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `load_balancers` | Balanceadores asociados al entorno |
 | `backend_cdn_url` | URL HTTPS de CloudFront del backend (vacío cuando `enable_cdn = false`; usar como `backend_url` en dev) |
 
+### Listener HTTPS y redirección 80 a 443
+
+La condición `local.https_enabled` (`load_balancer_type = "application"` y `ssl_certificate_arn` no vacío) activa el listener 443 y la redirección. Con ella, `data.aws_lb_listener.http` lee el listener del puerto 80 que crea Beanstalk (se usa `load_balancers[0]` como ARN del ALB, **(por confirmar)**) y `aws_lb_listener_rule.http_to_https` le añade una regla de prioridad 1 para `/*` que redirige a `HTTPS` puerto 443 con `HTTP_301`. No se importa el listener (`terraform import` está prohibido) ni se toca el health check, que va del grupo de destino al puerto 80 de la instancia y no pasa por el listener. En `dev` (instancia única) no se crea nada. La regla vive fuera del CloudFormation de Beanstalk: si Beanstalk recrea el listener 80, se pierde (S16 en [estado-y-deuda-tecnica.md](estado-y-deuda-tecnica.md#abiertos)).
+
 ## Módulo storage
 
 Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC para los assets públicos del frontend, y la política IAM que da acceso al rol de las instancias de Beanstalk.
+
+### Políticas y protección del bucket
+
+- **Política del bucket** (`aws_s3_bucket_policy.cloudfront_oac`; el nombre se conserva por compatibilidad con el estado, ver M12): dos sentencias. `AllowCloudFrontOAC` da `s3:GetObject` a CloudFront solo sobre `assets/*` y solo a la distribución del módulo (`AWS:SourceArn`). `DenyInsecureTransport` deniega `s3:*` a `Principal = "*"` sobre el bucket y sus objetos cuando `aws:SecureTransport` es `false`; solo restringe, no concede.
+- **Política IAM del rol de instancias** (`aws_iam_role_policy.beanstalk_s3`): `ObjectsInGalleryAndData` (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` sobre `gallery/*` y `data/*`) y `ListGalleryAndData` (`s3:ListBucket` sobre el bucket con `StringLike` en `s3:prefix` para `gallery/*` y `data/*`). Un listado sin `Prefix`, de la raíz o de `assets/` queda denegado, igual que leer o escribir en `assets/`.
+- **`prevent_destroy = true`** en `aws_s3_bucket.app`: `terraform destroy` falla mientras esté (ver el procedimiento de vaciado en el [README](../README.md#destroy-an-environment)).
+- **Ciclo de vida** (`aws_s3_bucket_lifecycle_configuration.app`): `expire-noncurrent-versions` expira las versiones no actuales a los 180 días y limpia los marcadores de borrado huérfanos; `abort-incomplete-multipart` aborta las subidas multipart incompletas a los 7 días. Las versiones vigentes no caducan.
 
 ### Variables
 

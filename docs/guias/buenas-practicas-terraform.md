@@ -70,15 +70,15 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 
 - **Regla:** los recursos con datos que no se pueden recrear (bucket de datos, bucket de estado) llevan `prevent_destroy = true` o una protección equivalente. `force_destroy` no se activa. Un `terraform destroy` exige vaciar el bucket a mano, a propósito.
 - **Por qué:** un `destroy` o un cambio de nombre que fuerce el reemplazo borraría la investigación subida por el equipo.
-- **Cómo:** `quality-check` avisa de los buckets sin `prevent_destroy` (deuda M6).
-- **Estado:** el bucket de datos **no** tiene `prevent_destroy` (M6). No tiene `force_destroy`, así que `destroy` falla si hay objetos (verificado; [README](../../README.md#destroy-an-environment) lo explica). El bucket de estado no lo gestiona Terraform (M3).
+- **Cómo:** `quality-check` avisa de los buckets sin `prevent_destroy`.
+- **Estado:** el bucket de datos tiene `prevent_destroy = true` en `modules/storage/main.tf` (M6 resuelto en código, verificado): `destroy` falla en ambos entornos hasta que se quite de forma revisada ([README](../../README.md#destroy-an-environment) explica el vaciado manual). No tiene `force_destroy`. El bucket de estado no lo gestiona Terraform (M3).
 
 ### BP-9. Costes
 
 - **Regla:** las decisiones que cuestan dinero se justifican en el código o en el README: tipo de instancia mínimo, balanceador solo en prod, versionado de S3 con una regla de ciclo de vida para las versiones antiguas. Antes de un `apply` se revisa en el `plan` qué recursos nuevos se crean y se estima su coste mensual.
 - **Por qué:** un ALB o una instancia mayor se facturan cada mes; nadie lo nota hasta que llega la factura.
 - **Cómo:** manual (estimación con el precio de la región, anotada en la PR; ver [mantenimiento.md](mantenimiento.md#6-listas-de-comprobación-por-tipo-de-cambio)). Las etiquetas (BP-6) permiten ver el coste por componente.
-- **Estado:** instancia mínima en ambos entornos y balanceador solo en prod (verificado en `environments/*/main.tf`, con el ahorro indicado en un comentario). El bucket versiona sin regla de ciclo de vida (las versiones antiguas se acumulan). No hay alertas de facturación en Terraform (S11).
+- **Estado:** instancia mínima en ambos entornos y balanceador solo en prod (verificado en `environments/*/main.tf`, con el ahorro indicado en un comentario). El bucket versiona y su ciclo de vida expira las versiones no actuales a los 180 días y aborta las subidas multipart incompletas a los 7 días (`aws_s3_bucket_lifecycle_configuration.app`, verificado; efecto aplicado **(por confirmar)**). No hay alertas de facturación en Terraform (S11).
 
 ### BP-10. Nombres y estilo
 
@@ -125,7 +125,7 @@ Lo que no se debe imitar y ya está registrado:
 | Variables sin `description` | Deuda registrada (M7) |
 | Secretos en `.tf`, ejemplos y documentos | Ninguno (`quality-check`) |
 | Bloqueo de concurrencia y `encrypt` en el estado | No (S3) |
-| `prevent_destroy` en el bucket de datos | No (M6) |
+| `prevent_destroy` en el bucket de datos | Sí en código (M6) |
 | Etiqueta `Component` | En todos los recursos etiquetables (M8 resuelto) |
 | Integración continua | `ci.yml` sin credenciales de AWS; escaneo `trivy config` informativo (M9) |
 

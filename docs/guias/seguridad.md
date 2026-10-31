@@ -45,11 +45,11 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 
 - **Por qué:** un permiso excesivo convierte cualquier fallo en un incidente grande.
 - **Regla:**
-  - Las políticas nombran acciones y recursos concretos; nunca `Action: *`, `Resource: *` ni `Principal: *` (`quality-check` falla con los comodines).
+  - Las políticas nombran acciones y recursos concretos; nunca `Action: *`, `Resource: *` ni `Principal: *` en una sentencia `Allow` (`quality-check` falla con los comodines en `Allow`). **Excepción de `Deny` de TLS:** una sentencia `Effect = "Deny"` con `Principal = "*"` y `Action = "s3:*"` (como `DenyInsecureTransport` de `modules/storage`, condición `aws:SecureTransport = false`) solo restringe y no concede nada, así que no incumple la regla; `quality-check` solo vigila `Principal "*"` y `Action` comodín en sentencias `Allow`.
   - Una cuenta por entorno aísla los roles: el rol `aws-elasticbeanstalk-ec2-role` es el mismo nombre en cada cuenta, y `modules/storage` le añade una política propia del bucket del entorno. Si dos entornos compartieran cuenta, ambos bloques se sumarían en el mismo rol.
   - Terraform se ejecuta con el permiso de administrador de SSO. Para automatizarlo (integración continua), se usa un rol con los permisos justos, no administrador ([iam-role-setup.md](../iam-role-setup.md)).
 - **Cómo:** `quality-check` (comodines en políticas); el resto es revisión manual de cada cambio en `modules/storage` y de las políticas gestionadas de los roles de Beanstalk.
-- **Estado:** la política de `modules/storage` se limita al bucket del entorno y a cuatro acciones de S3 (verificado), pero da escritura y borrado sobre todo el bucket, incluida la carpeta de recursos públicos del frontend (S7). Los roles se crearon a mano (M3). Terraform corre con administrador de SSO (S14).
+- **Estado:** la política IAM de `modules/storage` se limita a `GetObject`, `PutObject` y `DeleteObject` sobre `gallery/*` y `data/*`, y a `ListBucket` con condición de `s3:prefix` (`gallery/*`, `data/*`); sin comodines en `Action` y sin acceso a `assets/*` (S7 resuelto en código, verificado en `modules/storage/main.tf`; efecto aplicado **(por confirmar)**). Dependencia del `apply`: el backend debe tratar `AccessDenied` (S15). Los roles se crearon a mano (M3). Terraform corre con administrador de SSO (S14).
 
 ### SEG-5. Credenciales de larga duración
 
@@ -62,8 +62,8 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 
 - **Por qué:** el bucket guarda la investigación y, hoy, también los recursos que el frontend necesita públicos.
 - **Regla:** bloqueo de acceso público con sus cuatro opciones, cifrado en reposo, versionado, política que exija TLS (`aws:SecureTransport`), registros de acceso y `prevent_destroy`. Los recursos públicos del frontend se sirven con **CloudFront y OAC** (el bucket sigue privado) y no abriendo el bucket.
-- **Cómo:** `quality-check` falla en un bucket nuevo sin bloqueo de acceso público, cifrado o versionado; y avisa (deuda) de la política TLS, los registros y `prevent_destroy`.
-- **Estado:** bloqueo de acceso público, cifrado AES256 y versionado: sí (verificado). Política TLS y registros de acceso: no (S5). `prevent_destroy`: no (M6). Los recursos públicos se sirven por CloudFront con OAC (`modules/storage/main.tf`, verificado): el bucket sigue privado y la política `AllowCloudFrontOAC` solo admite a la distribución. Esa política da `s3:GetObject` sobre todo el bucket y la distribución no filtra por prefijo, así que CloudFront podría servir también `data/` y `gallery/` (C13, **(por confirmar)**). Nada sube aún `assets/…` (C7).
+- **Cómo:** `quality-check` falla en un bucket nuevo sin bloqueo de acceso público, cifrado o versionado; y avisa (deuda) de la política TLS, los registros y `prevent_destroy` (hoy solo queda la deuda de registros de `modules/storage:app`, S5).
+- **Estado:** bloqueo de acceso público, cifrado AES256 y versionado: sí (verificado). Política TLS (sentencia `DenyInsecureTransport`) y `prevent_destroy`: sí en código (verificado; S5 parcial y M6 resuelto en código; efecto aplicado **(por confirmar)**). Registros de acceso: no (S5, deuda abierta). Ciclo de vida: versiones no actuales a 180 días y multipart incompleto a 7 días (M6). Los recursos públicos se sirven por CloudFront con OAC (`modules/storage/main.tf`, verificado): el bucket sigue privado y `AllowCloudFrontOAC` solo da `s3:GetObject` a la distribución sobre `assets/*` (C13 resuelto en código; efecto **(por confirmar)** tras el `apply` en dev). Nada sube aún `assets/…` (C7).
 
 ### SEG-7. Red y cómputo
 
@@ -77,7 +77,7 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 - **Por qué:** sin HTTPS, contraseñas y token viajan en claro, y el navegador bloquea el contenido mixto.
 - **Regla:** HTTPS obligatorio en todo entorno que se use; el ALB con una política TLS moderna; el certificado en la misma región que el proveedor; el puerto 80 solo redirige a HTTPS.
 - **Cómo:** `docs-check` avisa de `backend_url` con `http://` y comprueba la región del ARN de ACM en la plantilla.
-- **Estado:** prod: listener 443 con la política `ELBSecurityPolicy-TLS13-1-2-2021-06` (verificado). No hay redirección de 80 a 443 en el código (verificado; el efecto real está **por confirmar**) (S8). dev: instancia única sin HTTPS, que rompe el frontend (C4).
+- **Estado:** prod: listener 443 con la política `ELBSecurityPolicy-TLS13-1-2-2021-06` (verificado). Redirección 301 de 80 a 443 en el listener 80 solo con ALB y certificado (`aws_lb_listener_rule.http_to_https`, verificado en código; S8 resuelto en código); efecto en prod **(por confirmar)** hasta el `apply` en prod, y se pierde si Beanstalk recrea el listener (S16). dev: instancia única sin HTTPS, que rompe el frontend (C4).
 
 ### SEG-9. Cabeceras de seguridad y acceso a preproducción (Amplify)
 
@@ -133,13 +133,14 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | Estado remoto: versionado | Sí (a mano) |
 | Estado remoto: cifrado explícito, bloqueo, política TLS, bloqueo de acceso público | No consta (S3, S4) |
 | Bucket de datos: bloqueo de acceso público, cifrado, versionado | Sí |
-| Bucket de datos: política TLS, registros, `prevent_destroy` | No (S5, M6) |
-| Recursos públicos del frontend por CloudFront con OAC (bucket privado) | Sí en código (C2 resuelto); sin `assets/…` subidos (C7); alcance de la política sobre todo el bucket (C13, por confirmar) |
-| Política IAM de `modules/storage` sin comodines | Sí, pero con escritura sobre todo el bucket (S7) |
+| Bucket de datos: política TLS, `prevent_destroy`, ciclo de vida | Sí en código (S5 parcial, M6); efecto por confirmar |
+| Bucket de datos: registros de acceso | No (S5) |
+| Recursos públicos del frontend por CloudFront con OAC (bucket privado) | Sí en código (C2 resuelto); sin `assets/…` subidos (C7); política de CloudFront solo sobre `assets/*` (C13 resuelto en código; efecto por confirmar) |
+| Política IAM de `modules/storage` sin comodines | Sí, acotada a `gallery/*` y `data/*` (S7 resuelto en código; efecto por confirmar) |
 | Claves de acceso antiguas rotadas | **(por confirmar)** (S12) |
 | SSH cerrado por defecto, IMDSv1 desactivado | Sí |
 | VPC por defecto, instancias con IP pública | Sí (S13) |
-| HTTPS en prod con política TLS 1.3 | Sí; sin redirección de 80 a 443 (S8) |
+| HTTPS en prod con política TLS 1.3 | Sí; redirección de 80 a 443 en código (S8); efecto en prod por confirmar |
 | HTTPS en dev | Sí, CloudFront delante de Beanstalk (C4 resuelto) |
 | Cabeceras de seguridad en Amplify | Sin definir (C11) |
 | Autenticación básica en preproducción | No (S9) |

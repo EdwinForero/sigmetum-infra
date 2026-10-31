@@ -41,9 +41,9 @@ const KNOWN_DEBT = {
   lockfileIgnored: 'M5 (la práctica recomendada es versionarlo)',
   // bloque backend "s3" sin cifrado explícito ni bloqueo de concurrencia
   stateBackend: { dev: 'S3', prod: 'S3' },
-  // buckets: política TLS, registros de acceso y prevent_destroy
+  // buckets: política TLS, registros de acceso y prevent_destroy (TLS y prevent_destroy de storage resueltos; queda S5 logging)
   buckets: {
-    'modules/storage:app': { tls: 'S5', logging: 'S5', preventDestroy: 'M6' },
+    'modules/storage:app': { logging: 'S5' },
     // TLS is enforced via aws_iam_policy_document (DenyNonTLS statement); checker can't see through data source references
     'modules/backend-ci-iam:deploys': { tls: 'implemented-via-data-source', logging: 'M9', versioning: 'M9' },
   },
@@ -92,6 +92,32 @@ const blocks = (text, keyword) => {
       i++;
     }
     out.push({ name: match[1], label: match[2], body: text.slice(re.lastIndex, i - 1) });
+  }
+  return out;
+};
+// Devuelve el texto sin los objetos de política (llaves de jsonencode o JSON) que contienen Effect = "Deny".
+const withoutDenyStatements = (text) => {
+  let out = text;
+  const re = /"?Effect"?\s*[=:]\s*"Deny"/;
+  let match;
+  while ((match = re.exec(out))) {
+    let start = match.index;
+    for (let depth = 0; start > 0; start--) {
+      if (out[start - 1] === '}') depth++;
+      else if (out[start - 1] === '{') {
+        if (depth === 0) break;
+        depth--;
+      }
+    }
+    let end = match.index;
+    for (let depth = 0; end < out.length; end++) {
+      if (out[end] === '{') depth++;
+      else if (out[end] === '}') {
+        if (depth === 0) break;
+        depth--;
+      }
+    }
+    out = out.slice(0, start) + out.slice(end);
   }
   return out;
 };
@@ -199,8 +225,10 @@ const outputs = tfFiles
       }
     }
     if (/SSHSourceRestriction[\s\S]{0,120}0\.0\.0\.0\/0/.test(text)) problems.push(`${file}: SSHSourceRestriction abierto a 0.0.0.0/0`);
-    if (/Principal\s*=\s*"\*"|"Principal"\s*:\s*"\*"/.test(text)) problems.push(`${file}: política con Principal "*"`);
-    if (/Action\s*=\s*(?:"\*"|"[a-z0-9]+:\*"|\["\*"\])/i.test(text)) problems.push(`${file}: política IAM con Action comodín (*)`);
+    // Principal "*" y Action comodín solo se vigilan en sentencias Allow: un Deny (p. ej. TLS) restringe, no concede
+    const allowText = withoutDenyStatements(text);
+    if (/Principal\s*=\s*"\*"|"Principal"\s*:\s*"\*"/.test(allowText)) problems.push(`${file}: política con Principal "*"`);
+    if (/Action\s*=\s*(?:"\*"|"[a-z0-9]+:\*"|\[[^\]]*"(?:[a-z0-9]+:)?\*")/i.test(allowText)) problems.push(`${file}: política IAM con Action comodín (*)`);
     if (/provisioner\s+"|null_resource|local-exec|remote-exec/.test(text)) problems.push(`${file}: usa provisioner o null_resource (ver docs/guias/buenas-practicas-terraform.md)`);
   }
   for (const v of variables.filter((x) => x.name === 'ssh_allowed_cidrs')) {

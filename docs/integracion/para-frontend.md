@@ -83,7 +83,7 @@ Sin `customHeaders` (infra:C11, verificado).
 
 ### Recursos estáticos (`assets/…`)
 
-El bucket bloquea el acceso público con sus cuatro opciones y se sirve por CloudFront con OAC (`modules/storage/main.tf`, verificado); `VITE_S3_URL` es la URL de CloudFront en `dev` y `prod`. Nada sube aún los ficheros de `assets/…` al bucket (infra:C7, verificado), así que `prod` da 403/404 en favicon y logos hasta resolverlo (riesgo aceptado). Que CloudFront sirva solo `assets/*` no está garantizado (C13 en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md#abiertos), por confirmar).
+El bucket bloquea el acceso público con sus cuatro opciones y se sirve por CloudFront con OAC (`modules/storage/main.tf`, verificado); `VITE_S3_URL` es la URL de CloudFront en `dev` y `prod`. Nada sube aún los ficheros de `assets/…` al bucket (infra:C7, verificado), así que `prod` da 403/404 en favicon y logos hasta resolverlo (riesgo aceptado). **CloudFront sirve solo `assets/*`** (la política del bucket da `s3:GetObject` a la distribución únicamente sobre `assets/*`, `modules/storage/main.tf`, verificado en código; C13 resuelto en código en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md#resueltos); efecto aplicado **(por confirmar)** tras el `apply` en `dev`): todo recurso público del frontend debe vivir bajo `assets/`. Una clave de `gallery/`, `data/` o la raíz pedida por CloudFront no devolverá el objeto. El frontend debe comprobar que no pide por `VITE_S3_URL` nada fuera de `assets/` **(por confirmar)**.
 
 ### Certificado y TLS
 

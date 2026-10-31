@@ -30,6 +30,7 @@ modules/
 | HTTPS | No (CloudFront proxy para dev, sin ACM) | Yes (ACM en ALB) |
 | DNS | — | `backend.sigmetum-a.org` |
 | CI artifacts bucket | `sigmetum-backend-deploys-dev` | `sigmetum-backend-deploys-prod` |
+| HTTP to HTTPS redirect (80 to 443) | — | Yes (listener rule, 301; only with ALB and certificate) |
 | Region | eu-west-3 | eu-west-3 |
 
 Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
@@ -118,8 +119,13 @@ cd environments/dev   # or prod
 terraform destroy
 ```
 
-> The S3 bucket for app assets will fail to destroy if it contains objects. Empty it first:
-> `aws s3 rm s3://sigmetum-app-assets-dev --recursive`
+> **The app assets bucket has `prevent_destroy = true` in both environments, so `terraform destroy` fails on purpose** (it also fails if the bucket contains objects). To destroy an environment, do it manually and deliberately:
+>
+> 1. Empty the bucket, including every object version and delete marker (`aws s3 rm s3://<bucket> --recursive` only adds delete markers on a versioned bucket; delete the versions and markers too, e.g. with `aws s3api delete-objects`).
+> 2. Remove `prevent_destroy` from `aws_s3_bucket.app` in `modules/storage/main.tf` through a reviewed change.
+> 3. Only then run `terraform destroy`, with explicit confirmation.
+>
+> The bucket also has a lifecycle rule (non-current versions expire after 180 days, incomplete multipart uploads after 7 days). The HTTP to HTTPS redirect (port 80 to 443, 301) exists only in prod (ALB with certificate); dev has no ALB.
 
 ## Cost tracking
 
@@ -155,6 +161,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [docs/integracion/para-backend.md](docs/integracion/para-backend.md) | What it provides to and needs from the backend (`app_env_vars`, health check, ALB, S3 IAM) |
 | [Spec](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-design.md), [plan](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-plan.md) and [PR notice](docs/specs/2026-10-30-ajustes-integracion-frontend-backend-aviso-pr.md) | Integration adjustments with frontend and backend (30/10/2026): `s3_url` in prod, Node 22 and `npm test` in the Amplify `build_spec` |
 | [Spec](docs/specs/2026-10-30-fix-regla-spa-amplify-design.md), [plan](docs/specs/2026-10-30-fix-regla-spa-amplify-plan.md) and [PR notice](docs/specs/2026-10-30-fix-regla-spa-amplify-aviso-pr.md) | Amplify SPA rewrite rule fix (30/10/2026): `source` of the SPA rule in `</regex/>` format (C14) |
+| [Spec](docs/specs/2026-10-30-seguridad-bucket-iam-tls-design.md), [plan](docs/specs/2026-10-30-seguridad-bucket-iam-tls-plan.md) and [PR notice](docs/specs/2026-10-30-seguridad-bucket-iam-tls-aviso-pr.md) | Bucket, instance IAM, TLS and ALB security (30/10/2026): CloudFront only on `assets/*`, IAM by prefix, TLS deny, `prevent_destroy`, lifecycle and prod 80 to 443 redirect (C13, S7, S8, M6; S5 partial) |
 
 ## CI and GitHub
 
