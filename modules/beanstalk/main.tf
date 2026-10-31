@@ -1,5 +1,7 @@
 locals {
   https_enabled = var.load_balancer_type == "application" && var.ssl_certificate_arn != ""
+
+  restrict_origin = var.enable_cdn && var.load_balancer_type == "single"
 }
 
 resource "aws_elastic_beanstalk_application" "this" {
@@ -52,6 +54,16 @@ resource "aws_elastic_beanstalk_environment" "this" {
     namespace = "aws:autoscaling:launchconfiguration"
     name      = "IamInstanceProfile"
     value     = "aws-elasticbeanstalk-ec2-role"
+  }
+
+  # Origin SG: port 80 only from CloudFront (dev single instance)
+  dynamic "setting" {
+    for_each = local.restrict_origin ? [aws_security_group.origin[0].id] : []
+    content {
+      namespace = "aws:autoscaling:launchconfiguration"
+      name      = "SecurityGroups"
+      value     = setting.value
+    }
   }
   setting {
     namespace = "aws:autoscaling:launchconfiguration"
@@ -307,6 +319,56 @@ resource "aws_elastic_beanstalk_environment" "this" {
   lifecycle {
     ignore_changes = [solution_stack_name]
   }
+}
+
+# ── Origin restriction (dev only): port 80 reachable only from CloudFront ─────
+data "aws_ec2_managed_prefix_list" "cloudfront" {
+  count = local.restrict_origin ? 1 : 0
+  name  = "com.amazonaws.global.cloudfront.origin-facing"
+}
+
+resource "aws_security_group" "origin" {
+  count       = local.restrict_origin ? 1 : 0
+  name_prefix = "sigmetum-backend-${var.environment}-origin-"
+  description = "Beanstalk instance: HTTP only from CloudFront"
+  vpc_id      = var.vpc_id
+
+  tags = {
+    Component = "backend"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_vpc_security_group_ingress_rule" "origin_http_cloudfront" {
+  count             = local.restrict_origin ? 1 : 0
+  security_group_id = aws_security_group.origin[0].id
+  prefix_list_id    = data.aws_ec2_managed_prefix_list.cloudfront[0].id
+  ip_protocol       = "tcp"
+  from_port         = 80
+  to_port           = 80
+  description       = "HTTP from CloudFront origin-facing prefix list"
+}
+
+# Beanstalk ignores SSHSourceRestriction when SecurityGroups is set (por confirmar)
+resource "aws_vpc_security_group_ingress_rule" "origin_remote_access" {
+  for_each          = local.restrict_origin && var.ssh_key_name != "" ? toset(var.ssh_allowed_cidrs) : toset([])
+  security_group_id = aws_security_group.origin[0].id
+  cidr_ipv4         = each.value
+  ip_protocol       = "tcp"
+  from_port         = 22
+  to_port           = 22
+  description       = "Remote access from explicit CIDRs"
+}
+
+resource "aws_vpc_security_group_egress_rule" "origin_all" {
+  count             = local.restrict_origin ? 1 : 0
+  security_group_id = aws_security_group.origin[0].id
+  cidr_ipv4         = "0.0.0.0/0"
+  ip_protocol       = "-1"
+  description       = "Outbound: S3, Beanstalk endpoints, SMTP"
 }
 
 # ── HTTP → HTTPS redirect (only when ALB + cert provided) ─────────────────────

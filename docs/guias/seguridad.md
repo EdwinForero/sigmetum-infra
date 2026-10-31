@@ -68,9 +68,9 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 ### SEG-7. Red y cómputo
 
 - **Por qué:** cada puerto abierto es superficie de ataque.
-- **Regla:** SSH cerrado por defecto (solo con un par de claves y una lista de CIDR explícita, nunca `0.0.0.0/0`); IMDSv1 desactivado; los grupos de seguridad los gestiona Beanstalk y cualquier apertura nueva se justifica.
+- **Regla:** SSH cerrado por defecto (solo con un par de claves y una lista de CIDR explícita, nunca `0.0.0.0/0`); IMDSv1 desactivado; los grupos de seguridad los gestiona Beanstalk (salvo el de la instancia de `dev`, que está en Terraform y admite HTTP solo desde CloudFront) y cualquier apertura nueva se justifica.
 - **Cómo:** `quality-check` falla con `0.0.0.0/0` hacia el puerto 22 o hacia puertos distintos de 80 y 443, y con un valor por defecto de `ssh_key_name`.
-- **Estado:** SSH cerrado (`ssh_key_name` vacío por defecto) y IMDSv1 desactivado: sí (verificado). Se usa el VPC por defecto y las instancias tienen IP pública (verificado); los grupos de seguridad no están en Terraform; el cifrado del disco raíz depende del valor por defecto de la cuenta **(por confirmar)** (S13).
+- **Estado:** SSH cerrado (`ssh_key_name` vacío por defecto) y IMDSv1 desactivado: sí (verificado). Se usa el VPC por defecto y las instancias tienen IP pública (verificado); los grupos de seguridad no están en Terraform, salvo el de la instancia de `dev` (puerto 80 solo desde CloudFront y salida abierta justificada por SMTP y S3; resuelto en código, pendiente del `apply` y de la puerta de decisión: ver S17 del estado, por confirmar); el cifrado del disco raíz depende del valor por defecto de la cuenta **(por confirmar)** (S13).
 
 ### SEG-8. TLS
 

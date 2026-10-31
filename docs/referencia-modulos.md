@@ -58,6 +58,20 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 
 La condición `local.https_enabled` (`load_balancer_type = "application"` y `ssl_certificate_arn` no vacío) activa el listener 443 y la redirección. Con ella, `data.aws_lb_listener.http` lee el listener del puerto 80 que crea Beanstalk (se usa `load_balancers[0]` como ARN del ALB, **(por confirmar)**) y `aws_lb_listener_rule.http_to_https` le añade una regla de prioridad 1 para `/*` que redirige a `HTTPS` puerto 443 con `HTTP_301`. No se importa el listener (`terraform import` está prohibido) ni se toca el health check, que va del grupo de destino al puerto 80 de la instancia y no pasa por el listener. En `dev` (instancia única) no se crea nada. La regla vive fuera del CloudFormation de Beanstalk: si Beanstalk recrea el listener 80, se pierde (S16 en [estado-y-deuda-tecnica.md](estado-y-deuda-tecnica.md#abiertos)).
 
+### Restricción del origen a CloudFront (solo `dev`)
+
+La condición `local.restrict_origin` (`enable_cdn` y `load_balancer_type = "single"`) crea, solo en `dev`, un grupo de seguridad propio de la instancia y lo pasa a Beanstalk con el setting `SecurityGroups` del espacio de nombres `aws:autoscaling:launchconfiguration`. Sin variables ni outputs nuevos. **(verificado en código; efecto en AWS por confirmar hasta el `apply`, S17)**
+
+| Recurso | Qué hace |
+|---|---|
+| `data.aws_ec2_managed_prefix_list.cloudfront` | Lee la lista de prefijos gestionada de CloudFront (`origin-facing`) |
+| `aws_security_group.origin` | Grupo propio de la instancia (`create_before_destroy`) |
+| `aws_vpc_security_group_ingress_rule.origin_http_cloudfront` | Entrada TCP por el puerto 80 solo desde esa lista de prefijos |
+| `aws_vpc_security_group_ingress_rule.origin_remote_access` | Acceso remoto desde `ssh_allowed_cidrs`, solo si `ssh_key_name` no está vacío (en `dev` está desactivado: no se crea) |
+| `aws_vpc_security_group_egress_rule.origin_all` | Salida abierta a todo: el backend sale a S3, a los endpoints de Beanstalk y al SMTP en otros puertos; es la misma apertura que ya tenía el grupo que crea Beanstalk |
+
+`prod` no cambia: el ALB tiene su propio grupo gestionado por Beanstalk y el recuento de estos recursos es cero (que el ALB no necesite este cambio, por confirmar). Cambiar `SecurityGroups` modifica la plantilla de lanzamiento y la instancia de `dev` se reemplaza: unos minutos de corte (por confirmar). La lista de prefijos cuenta como una regla por entrada y la cuota por defecto del grupo puede quedarse justa: si el `apply` falla con `RulesPerSecurityGroupLimitExceeded`, hay que pedir un aumento en Service Quotas (por confirmar). Si tras el `apply` un `curl` directo al CNAME sigue dando `200`, se revierte (puerta de decisión de S17).
+
 ## Módulo storage
 
 Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC para los assets públicos del frontend, y la política IAM que da acceso al rol de las instancias de Beanstalk.
@@ -218,7 +232,7 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## app_env_vars
 
-Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Son **secretos**: los valores solo viven en `terraform.tfvars` (ignorado por git). La variable `app_env_vars` de `modules/beanstalk` lleva una `validation` que comprueba en `plan` que estén las nueve claves obligatorias de la tabla (solo los nombres, nunca los valores); las claves extra son válidas y un valor vacío no se rechaza.
+Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Son **secretos**: los valores solo viven en `terraform.tfvars` (ignorado por git). La variable `app_env_vars` de `modules/beanstalk` lleva una `validation` que comprueba en `plan` que estén las nueve claves obligatorias de la tabla (solo los nombres, nunca los valores); las demás (`PORT` y `TRUST_PROXY_HOPS`) son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza.
 
 | Clave | Obligatoria en el backend | Notas |
 |---|---|---|
@@ -232,3 +246,4 @@ Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arr
 | `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#resueltos)). Admite una lista separada por comas; en `prod`, `https://<dominio>,https://www.<dominio>` (ver [para-backend.md](integracion/para-backend.md#7-allowed_origin-por-entorno)) |
 | `EMAIL` | Sí | Cuenta de correo del backend |
 | `EMAIL_PASSWORD` | Sí | Contraseña de aplicación, no la de la cuenta |
+| `TRUST_PROXY_HOPS` | No | Saltos de proxy de confianza del backend: cadena entera de 1 a 5, sin espacios ni ceros a la izquierda (el 0 solo con `NODE_ENV` `local` o `test`); 1 si no se define. `dev` y `prod` llevan el mismo valor; el de `dev` está medido en nginx y deducido en Express, y el de `prod` está por confirmar (ver [para-backend.md](integracion/para-backend.md#6-plataforma-tamaño-de-instancia-y-correo-saliente)) |

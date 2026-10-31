@@ -32,7 +32,10 @@ modules/
 | Frontend domain | — (Amplify default domain) | `sigmetum-a.org` and `www.sigmetum-a.org` (association and Route53 records created by the Amplify module, not by `modules/dns`) |
 | CI artifacts bucket | `sigmetum-backend-deploys-dev` | `sigmetum-backend-deploys-prod` |
 | HTTP to HTTPS redirect (80 to 443) | — | Yes (listener rule, 301; only with ALB and certificate) |
+| Origin access (port 80) | Own security group, CloudFront prefix list only (in code; pending `apply`, S17) | Security group of the ALB, managed by Beanstalk (unchanged) |
 | Region | eu-west-3 | eu-west-3 |
+
+Dev and prod differ on purpose in how the backend origin is protected: dev has no ALB, so the module creates a security group that only admits HTTP from CloudFront (and a direct call to the Beanstalk CNAME stops working); prod sits behind an ALB whose security group Beanstalk manages, so nothing is added there (whether the ALB needs this change is to be confirmed). See [S17](docs/estado-y-deuda-tecnica.md#abiertos) and [docs/referencia-modulos.md](docs/referencia-modulos.md#restricción-del-origen-a-cloudfront-solo-dev).
 
 Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
 
@@ -73,7 +76,7 @@ cd environments/dev
 set AWS_PROFILE=sigmetum-preprod
 ```
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev). `terraform plan` fails with "Invalid value for variable" if `app_env_vars` lacks any of the nine keys the backend requires at startup (names only are checked, never values).
+Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev). `terraform plan` fails with "Invalid value for variable" if `app_env_vars` lacks any of the nine keys the backend requires at startup (names only are checked, never values). `TRUST_PROXY_HOPS` is an optional `app_env_vars` key: its dev value (two) was measured at nginx and deduced for Express, and applying it reconfigures the Beanstalk environment and may restart the app.
 
 ```powershell
 terraform init
@@ -95,7 +98,7 @@ cd environments/prod
 set AWS_PROFILE=sigmetum-prod
 ```
 
-Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod). `terraform plan` fails with "Invalid value for variable" if `app_env_vars` lacks any of the nine keys the backend requires at startup (names only are checked, never values).
+Copy `terraform.tfvars.example` to `terraform.tfvars` and fill it in (never commit this file). The variables and the `app_env_vars` keys are described in [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod). `terraform plan` fails with "Invalid value for variable" if `app_env_vars` lacks any of the nine keys the backend requires at startup (names only are checked, never values). `TRUST_PROXY_HOPS` is an optional `app_env_vars` key and its prod value is to be confirmed: measure it with the procedure in [docs/integracion/para-backend.md](docs/integracion/para-backend.md#medir-los-saltos-de-proxy-trust_proxy_hops) before the first prod `apply`.
 
 ```powershell
 terraform init
@@ -168,6 +171,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [Spec](docs/specs/2026-10-30-fix-regla-spa-amplify-design.md), [plan](docs/specs/2026-10-30-fix-regla-spa-amplify-plan.md) and [PR notice](docs/specs/2026-10-30-fix-regla-spa-amplify-aviso-pr.md) | Amplify SPA rewrite rule fix (30/10/2026): `source` of the SPA rule in `</regex/>` format (C14) |
 | [Spec](docs/specs/2026-10-30-seguridad-bucket-iam-tls-design.md), [plan](docs/specs/2026-10-30-seguridad-bucket-iam-tls-plan.md) and [PR notice](docs/specs/2026-10-30-seguridad-bucket-iam-tls-aviso-pr.md) | Bucket, instance IAM, TLS and ALB security (30/10/2026): CloudFront only on `assets/*`, IAM by prefix, TLS deny, `prevent_destroy`, lifecycle and prod 80 to 443 redirect (C13, S7, S8, M6; S5 partial) |
 | [Spec](docs/specs/2026-10-31-limpieza-deuda-c-design.md), [plan](docs/specs/2026-10-31-limpieza-deuda-c-plan.md) and [PR notice](docs/specs/2026-10-31-limpieza-deuda-c-aviso-pr.md) | Debt cleanup (31/10/2026): unused variables removed, descriptions on all variables and outputs, `app_env_vars` key validation in the beanstalk module, account IDs replaced by markers in two guides (M1, M4, M2, M7, S1); no resource changes |
+| [Spec](docs/specs/2026-10-31-trust-proxy-hops-design.md), [plan](docs/specs/2026-10-31-trust-proxy-hops-plan.md) and [PR notice](docs/specs/2026-10-31-trust-proxy-hops-aviso-pr.md) | `TRUST_PROXY_HOPS` and dev origin restriction (31/10/2026): optional `app_env_vars` key measured in dev (`backend:I7` still open, prod to be confirmed) and a dev-only security group that admits port 80 only from CloudFront (S17) |
 
 ## CI and GitHub
 

@@ -57,4 +57,9 @@ app_env_vars = {
   # Contraseña de aplicación de Gmail (no la de tu cuenta).
   # Genera en: Google → Cuenta → Seguridad → Verificación en dos pasos → Contraseñas de aplicación
   EMAIL_PASSWORD = "CHANGE_ME_app_password"
+
+  # Saltos de proxy delante de Express (cadena entera de 1 a 5, sin espacios ni ceros a la izquierda).
+  # Opcional en el backend (1 si no se define). Mismo valor que dev, POR CONFIRMAR: recorrido esperado ALB, nginx, Express; prod no está medido.
+  # Procedimiento de medición: docs/integracion/para-backend.md (sección 6).
+  TRUST_PROXY_HOPS = "2"
 }
