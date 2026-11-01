@@ -39,11 +39,10 @@ const KNOWN_DEBT = {
   fmt: {},
   // bloque backend "s3" sin cifrado explícito ni bloqueo de concurrencia: S3 resuelto; objeto vacío retenido para estructura
   stateBackend: {},
-  // buckets: política TLS, registros de acceso y prevent_destroy (TLS y prevent_destroy de storage resueltos; queda S5 logging)
+  // buckets: política TLS, registros de acceso y prevent_destroy (solo queda el bucket de logs, sin registros de acceso: M15)
   buckets: {
-    'modules/storage:app': { logging: 'S5' },
-    // TLS is enforced via aws_iam_policy_document (DenyNonTLS statement); checker can't see through data source references
-    'modules/backend-ci-iam:deploys': { tls: 'implemented-via-data-source', logging: 'M9', versioning: 'M9' },
+    // el bucket de logs no se registra a sí mismo (evita el bucle de logs sobre logs): M15
+    'modules/storage:access_logs': { logging: 'M15' },
   },
   // recursos etiquetables sin la etiqueta Component — M8 resuelto; objeto vacío retenido para estructura
   untagged: {},

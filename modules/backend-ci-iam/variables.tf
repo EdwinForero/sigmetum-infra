@@ -17,3 +17,8 @@ variable "aws_region" {
   description = "AWS region where Beanstalk resources live, e.g. eu-west-3."
   type        = string
 }
+
+variable "access_logs_bucket_name" {
+  description = "Name of the S3 bucket that receives the access logs of the Beanstalk staging bucket."
+  type        = string
+}

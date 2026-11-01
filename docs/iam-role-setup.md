@@ -17,6 +17,8 @@ Este enfoque (rol manual + `assume_role`) es útil si en el futuro quieres corre
 3. Configura el trust policy para que lo pueda asumir el runner de CI
 4. Añade `assume_role` al `providers.tf` del ambiente correspondiente
 
+> **Nota sobre `modules/backend-ci-iam`:** el módulo tiene una variable obligatoria nueva, `access_logs_bucket_name` (nombre del bucket de logs de acceso del entorno; los entornos le pasan `module.storage.access_logs_bucket_name`). Sirve para activar los registros de acceso del bucket de staging de Beanstalk con `aws_s3_bucket_logging`. No cambian los permisos del rol de CI; quien haga el `apply` necesita `s3:PutBucketLogging` sobre ese bucket.
+
 ---
 
 ## Before you start — set the correct region

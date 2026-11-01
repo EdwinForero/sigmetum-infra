@@ -30,12 +30,15 @@ modules/
 | HTTPS | No (CloudFront proxy para dev, sin ACM) | Yes (ACM en ALB) |
 | DNS | — | `backend.sigmetum-a.org` |
 | Frontend domain | — (Amplify default domain) | `sigmetum-a.org` and `www.sigmetum-a.org` (association and Route53 records created by the Amplify module, not by `modules/dns`) |
+| Access logs bucket | `sigmetum-access-logs-dev` | `sigmetum-access-logs-prod` |
 | CI artifacts bucket | `sigmetum-backend-deploys-dev` | `sigmetum-backend-deploys-prod` |
 | HTTP to HTTPS redirect (80 to 443) | — | Yes (listener rule, 301; only with ALB and certificate) |
 | Origin access (port 80) | Own security group, CloudFront prefix list only (in code; pending `apply`, S17) | Security group of the ALB, managed by Beanstalk (unchanged) |
 | Region | eu-west-3 | eu-west-3 |
 
 Dev and prod differ on purpose in how the backend origin is protected: dev has no ALB, so the module creates a security group that only admits HTTP from CloudFront (and a direct call to the Beanstalk CNAME stops working); prod sits behind an ALB whose security group Beanstalk manages, so nothing is added there (whether the ALB needs this change is to be confirmed). See [S17](docs/estado-y-deuda-tecnica.md#abiertos) and [docs/referencia-modulos.md](docs/referencia-modulos.md#restricción-del-origen-a-cloudfront-solo-dev).
+
+Each environment has its own S3 access logs bucket (`sigmetum-access-logs-<env>`, created in `modules/storage`) that receives the access logs of the data bucket (`app-data/` prefix) and of the Beanstalk staging bucket (`beanstalk-staging/` prefix, only its logging setting is managed by Terraform). Logs expire after ninety days; the bucket has `prevent_destroy` and does not log itself ([M15](docs/estado-y-deuda-tecnica.md#abiertos)). Dev and prod have the same structure; only the name changes, so there is no divergence.
 
 Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
 
@@ -177,6 +180,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [Spec](docs/specs/2026-10-31-limpieza-deuda-c-design.md), [plan](docs/specs/2026-10-31-limpieza-deuda-c-plan.md) and [PR notice](docs/specs/2026-10-31-limpieza-deuda-c-aviso-pr.md) | Debt cleanup (31/10/2026): unused variables removed, descriptions on all variables and outputs, `app_env_vars` key validation in the beanstalk module, account IDs replaced by markers in two guides (M1, M4, M2, M7, S1); no resource changes |
 | [Spec](docs/specs/2026-10-31-trust-proxy-hops-design.md), [plan](docs/specs/2026-10-31-trust-proxy-hops-plan.md) and [PR notice](docs/specs/2026-10-31-trust-proxy-hops-aviso-pr.md) | `TRUST_PROXY_HOPS` and dev origin restriction (31/10/2026): optional `app_env_vars` key measured in dev (`backend:I7` still open, prod to be confirmed) and a dev-only security group that admits port 80 only from CloudFront (S17) |
 | [Spec](docs/specs/2026-10-31-m2-node-env-react-design.md), [plan](docs/specs/2026-10-31-m2-node-env-react-plan.md) and [PR notice](docs/specs/2026-10-31-m2-node-env-react-aviso-pr.md) | M2 reopened: `NODE_ENV` removed from Amplify; React in production mode |
+| [Spec](docs/specs/2026-10-31-observabilidad-acceso-design.md), [plan](docs/specs/2026-10-31-observabilidad-acceso-plan.md) and [PR notice](docs/specs/2026-10-31-observabilidad-acceso-aviso-pr.md) | S3 access logs (31/10/2026): per-environment access logs bucket, logging on the data bucket and the Beanstalk staging bucket, ninety-day retention (S5 and M11 resolved in code; M15 new) |
 | [Spec](docs/specs/2026-10-31-estado-remoto-design.md), [plan](docs/specs/2026-10-31-estado-remoto-plan.md) and [PR notice](docs/specs/2026-10-31-estado-remoto-aviso-pr.md) | Remote state, versions and lock file (31/10/2026): `encrypt` and native S3 locking in both backends, Terraform >= 1.11, CI on 1.15.5, versioned lock files (S3 and M5 resolved in code; S4 partial) |
 
 ## CI and GitHub

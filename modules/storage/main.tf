@@ -1,3 +1,15 @@
+data "aws_caller_identity" "current" {}
+data "aws_region" "current" {}
+
+# local.access_logs_bucket exists so that the text of the data bucket logging does not
+# contain the access-logs bucket reference followed by a dot: the quality-check
+# "logging" rule matches that string and would wrongly treat the logs bucket as logged.
+locals {
+  account_id         = data.aws_caller_identity.current.account_id
+  staging_bucket_arn = "arn:aws:s3:::elasticbeanstalk-${data.aws_region.current.name}-${local.account_id}"
+  access_logs_bucket = aws_s3_bucket.access_logs.id
+}
+
 resource "aws_s3_bucket" "app" {
   bucket = var.bucket_name
 
@@ -188,4 +200,105 @@ resource "aws_iam_role_policy" "beanstalk_s3" {
       }
     ]
   })
+}
+
+# ── Access logs bucket ─────────────────────────────────────────────────────
+resource "aws_s3_bucket" "access_logs" {
+  bucket = "sigmetum-access-logs-${var.environment}"
+  tags   = { Component = "storage" }
+  lifecycle { prevent_destroy = true }
+}
+
+resource "aws_s3_bucket_public_access_block" "access_logs" {
+  bucket                  = aws_s3_bucket.access_logs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+  rule {
+    apply_server_side_encryption_by_default { sse_algorithm = "AES256" }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+  versioning_configuration { status = "Enabled" }
+}
+
+resource "aws_s3_bucket_ownership_controls" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+  rule { object_ownership = "BucketOwnerEnforced" }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+
+  rule {
+    id     = "expire-logs"
+    status = "Enabled"
+    filter {}
+    expiration { days = 90 }
+    noncurrent_version_expiration { noncurrent_days = 7 }
+  }
+  rule {
+    id     = "expire-orphan-delete-markers"
+    status = "Enabled"
+    filter {}
+    expiration { expired_object_delete_marker = true }
+  }
+  rule {
+    id     = "abort-incomplete-multipart"
+    status = "Enabled"
+    filter {}
+    abort_incomplete_multipart_upload { days_after_initiation = 7 }
+  }
+  depends_on = [aws_s3_bucket_versioning.access_logs]
+}
+
+resource "aws_s3_bucket_policy" "access_logs" {
+  bucket = aws_s3_bucket.access_logs.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "S3ServerAccessLogsDelivery"
+        Effect    = "Allow"
+        Principal = { Service = "logging.s3.amazonaws.com" }
+        Action    = "s3:PutObject"
+        Resource = [
+          "${aws_s3_bucket.access_logs.arn}/app-data/*",
+          "${aws_s3_bucket.access_logs.arn}/beanstalk-staging/*"
+        ]
+        Condition = {
+          ArnLike      = { "aws:SourceArn" = [aws_s3_bucket.app.arn, local.staging_bucket_arn] }
+          StringEquals = { "aws:SourceAccount" = local.account_id }
+        }
+      },
+      {
+        Sid       = "DenyInsecureTransport"
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource  = [aws_s3_bucket.access_logs.arn, "${aws_s3_bucket.access_logs.arn}/*"]
+        Condition = { Bool = { "aws:SecureTransport" = "false" } }
+      }
+    ]
+  })
+  depends_on = [
+    aws_s3_bucket_public_access_block.access_logs,
+    aws_s3_bucket_ownership_controls.access_logs,
+    aws_s3_bucket_server_side_encryption_configuration.access_logs,
+    aws_s3_bucket_versioning.access_logs,
+  ]
+}
+
+resource "aws_s3_bucket_logging" "app" {
+  bucket        = aws_s3_bucket.app.id
+  target_bucket = local.access_logs_bucket
+  target_prefix = "app-data/"
+  depends_on    = [aws_s3_bucket_policy.access_logs]
 }

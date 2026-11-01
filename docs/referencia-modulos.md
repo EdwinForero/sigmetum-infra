@@ -82,6 +82,10 @@ Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC par
 - **Política IAM del rol de instancias** (`aws_iam_role_policy.beanstalk_s3`): `ObjectsInGalleryAndData` (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` sobre `gallery/*` y `data/*`) y `ListGalleryAndData` (`s3:ListBucket` sobre el bucket con `StringLike` en `s3:prefix` para `gallery/*` y `data/*`). Un listado sin `Prefix`, de la raíz o de `assets/` queda denegado, igual que leer o escribir en `assets/`.
 - **`prevent_destroy = true`** en `aws_s3_bucket.app`: `terraform destroy` falla mientras esté (ver el procedimiento de vaciado en el [README](../README.md#destroy-an-environment)).
 - **Ciclo de vida** (`aws_s3_bucket_lifecycle_configuration.app`): `expire-noncurrent-versions` expira las versiones no actuales a los 180 días y limpia los marcadores de borrado huérfanos; `abort-incomplete-multipart` aborta las subidas multipart incompletas a los 7 días. Las versiones vigentes no caducan.
+- **Bucket de logs de acceso** (`aws_s3_bucket.access_logs`, nombre `sigmetum-access-logs-<entorno>`, uno por entorno, sin variable nueva): recibe los registros de acceso de S3 del bucket de datos (prefijo `app-data/`, `aws_s3_bucket_logging.app`) y del bucket de staging de Beanstalk (prefijo `beanstalk-staging/`, ver [backend-ci-iam](#módulo-backend-ci-iam)). Recursos: el bucket (con `prevent_destroy = true`), `aws_s3_bucket_public_access_block.access_logs`, `aws_s3_bucket_server_side_encryption_configuration.access_logs` (AES256), `aws_s3_bucket_versioning.access_logs`, `aws_s3_bucket_ownership_controls.access_logs` (`BucketOwnerEnforced`, sin ACL), `aws_s3_bucket_lifecycle_configuration.access_logs` y `aws_s3_bucket_policy.access_logs`.
+- **Política del bucket de logs** (`aws_s3_bucket_policy.access_logs`): `S3ServerAccessLogsDelivery` da `s3:PutObject` a `logging.s3.amazonaws.com` solo sobre `app-data/*` y `beanstalk-staging/*`, con las condiciones `aws:SourceArn` (el bucket de datos y el de staging) y `aws:SourceAccount` (la cuenta, por data source); `DenyInsecureTransport` deniega `s3:*` sin TLS. Depende del bloqueo público, la propiedad de objetos, el cifrado y el versionado para no escribir en paralelo sobre el bucket.
+- **Ciclo de vida del bucket de logs**: `expire-logs` expira los objetos a los 90 días y las versiones no actuales a los 7; `expire-orphan-delete-markers` limpia los marcadores de borrado huérfanos; `abort-incomplete-multipart` aborta las subidas incompletas a los 7 días. Los logs contienen IP de visitantes y claves de objeto.
+- El bucket de logs no registra sus propios accesos (evita el bucle de logs sobre logs): excepción aceptada M15 en `KNOWN_DEBT` de `quality-check`.
 
 ### Variables
 
@@ -96,6 +100,7 @@ Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC par
 |---|---|
 | `bucket_name` | Nombre del bucket |
 | `bucket_arn` | ARN del bucket |
+| `access_logs_bucket_name` | Nombre del bucket de logs de acceso; sale de la política de entrega, así que los consumidores (el logging de `backend-ci-iam`) se crean después de ella |
 | `cdn_url` | URL HTTPS de CloudFront para los assets del frontend (usar como `VITE_S3_URL`) |
 
 ## Módulo amplify
@@ -174,6 +179,9 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | `github_repo` | string | — | Repositorio GitHub en formato `owner/name` |
 | `github_branch` | string | — | Rama que puede asumir el rol CI |
 | `aws_region` | string | — | Región AWS donde viven los recursos de Beanstalk |
+| `access_logs_bucket_name` | string | — | Nombre del bucket que recibe los registros de acceso del bucket de staging de Beanstalk; obligatoria, los entornos le pasan `module.storage.access_logs_bucket_name` |
+
+**Registros de acceso del bucket de staging** (`aws_s3_bucket_logging.eb_staging`): activa los registros del bucket `elasticbeanstalk-<región>-<cuenta>` (nombre derivado de la región y la cuenta, sin literales) hacia `access_logs_bucket_name` con el prefijo `beanstalk-staging/`. El bucket lo crea Beanstalk, no Terraform: solo se gestiona este ajuste, sin `import`. Se sobrescribe cualquier configuración de logs previa y un cambio manual posterior aparecerá como deriva; en una cuenta sin el bucket (antes del primer despliegue de Beanstalk) el `apply` falla con `NoSuchBucket`. Los permisos del rol de CI no cambian.
 
 ### Outputs
 

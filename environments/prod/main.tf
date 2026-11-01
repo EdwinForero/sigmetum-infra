@@ -42,6 +42,8 @@ module "backend_ci_iam" {
   github_repo   = "EdwinForero/sigmetum-backend"
   github_branch = "master"
   aws_region    = "eu-west-3"
+
+  access_logs_bucket_name = module.storage.access_logs_bucket_name
 }
 
 module "amplify" {

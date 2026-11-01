@@ -6,6 +6,14 @@ locals {
   eb_env_arn = "arn:aws:elasticbeanstalk:${var.aws_region}:${local.account_id}:environment/sigmetum-backend-${var.environment}/sigmetum-backend-${var.environment}-env"
 }
 
+# ── Access logs of the Beanstalk staging bucket ───────────────────────────────
+# The bucket is created by Beanstalk, not by Terraform: only its logging setting is managed here.
+resource "aws_s3_bucket_logging" "eb_staging" {
+  bucket        = "elasticbeanstalk-${var.aws_region}-${local.account_id}"
+  target_bucket = var.access_logs_bucket_name
+  target_prefix = "beanstalk-staging/"
+}
+
 # ── GitHub OIDC provider (account-level, one per AWS account) ─────────────────
 resource "aws_iam_openid_connect_provider" "github" {
   url = "https://token.actions.githubusercontent.com"
