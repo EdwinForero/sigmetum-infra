@@ -38,8 +38,8 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 
 - **Por qué:** `sensitive = true` oculta el valor en la salida, pero el estado guarda los valores en claro (token de GitHub, `app_env_vars`).
 - **Regla:** el bucket de estado (uno por cuenta) tiene cifrado, versionado, bloqueo de acceso público y política TLS; solo quien despliega puede leerlo; el `backend "s3"` activa `encrypt` y un bloqueo de concurrencia. El estado nunca se copia a un equipo local ni se pega en una PR.
-- **Cómo:** `quality-check` avisa de los `backend` sin `encrypt` ni bloqueo. El resto depende de la cuenta: **(por confirmar)**.
-- **Estado:** versionado activado a mano; sin `encrypt` ni bloqueo en `backend.tf` (S3); el procedimiento manual no crea bloqueo de acceso público ni política TLS (S4); quién puede leerlo es **(por confirmar)** (S2).
+- **Cómo:** `quality-check` falla (ya no solo avisa) si un `backend` no tiene `encrypt` o el bloqueo. Operación del bloqueo y del cambio de backend: [mantenimiento.md](mantenimiento.md#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo). El resto depende de la cuenta: **(por confirmar)**.
+- **Estado:** `backend.tf` cifra y bloquea, resuelto en código (S3; efecto en las cuentas por confirmar hasta el `init -reconfigure`). El procedimiento del bucket ya incluye bloqueo de acceso público y política TLS. dev cumple versionado, bloqueo público y cifrado; faltan política TLS y etiquetas (comprobado el 31/10/2026). prod: por confirmar (S4 parcial). Quién puede leerlo es **(por confirmar)** (S2).
 
 ### SEG-4. IAM: mínimo privilegio
 
@@ -131,7 +131,7 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | Identificadores de cuenta en documentos | Ninguno (S1, resuelto) |
 | Secretos de la aplicación en propiedades de entorno de Beanstalk | Sí (S6) |
 | Estado remoto: versionado | Sí (a mano) |
-| Estado remoto: cifrado explícito, bloqueo, política TLS, bloqueo de acceso público | No consta (S3, S4) |
+| Estado remoto: cifrado explícito, bloqueo, política TLS, bloqueo de acceso público | Parcial: cifrado y bloqueo en código; política TLS por aplicar en dev y por confirmar en prod (S3, S4) |
 | Bucket de datos: bloqueo de acceso público, cifrado, versionado | Sí |
 | Bucket de datos: política TLS, `prevent_destroy`, ciclo de vida | Sí en código (S5 parcial, M6); efecto por confirmar |
 | Bucket de datos: registros de acceso | No (S5) |

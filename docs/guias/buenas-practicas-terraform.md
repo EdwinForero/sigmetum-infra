@@ -33,18 +33,18 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 
 ### BP-4. Versiones y archivo de bloqueo
 
-- **Regla:** `required_version` y cada proveedor llevan un rango acotado (`~>`). **`.terraform.lock.hcl` se versiona, uno por entorno**, y se actualiza en una PR propia con `terraform init -upgrade`. Para que sirva a todo el equipo se generan los hashes de las plataformas en uso (`terraform providers lock -platform=windows_amd64 -platform=linux_amd64 -platform=darwin_arm64`).
+- **Regla:** `required_version` y cada proveedor llevan un rango acotado (`~>`). **`.terraform.lock.hcl` se versiona, uno por entorno**, y se actualiza en una PR propia con `terraform init -upgrade`. Para que sirva a todo el equipo se generan los hashes de las plataformas en uso (`terraform providers lock -platform=windows_amd64 -platform=linux_amd64`); quien use otra plataforma (Mac) la añade en una PR propia ([mantenimiento.md](mantenimiento.md#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo)).
 - **Por qué:** sin el archivo de bloqueo, dos personas (o un `init` futuro) pueden resolver versiones distintas del proveedor y obtener `plan` diferentes para el mismo código. La documentación de HashiCorp recomienda versionarlo.
-- **Decisión de este repositorio:** se versiona. Todavía no se ha aplicado porque implica modificar `.gitignore` y generar los archivos (cambio fuera del alcance de la revisión que escribió esta guía).
-- **Cómo:** `quality-check` muestra el `.gitignore` actual como deuda (M5) y fallará si el archivo deja de estar ignorado sin estar versionado.
-- **Estado:** el proveedor `aws` está en `~> 5.0` (verificado). `required_version` es `>= 1.5` sin techo: aceptable mientras se use una versión reciente de Terraform, pero obliga a subirlo si se adopta `use_lockfile` (BP-5). **`.terraform.lock.hcl` está en `.gitignore`: incumple la decisión (M5).**
+- **Decisión de este repositorio:** se versiona (aplicada el 31/10/2026, M5).
+- **Cómo:** `quality-check` falla si `.terraform.lock.hcl` está en `.gitignore` o si algún entorno no tiene su lockfile en el índice de git.
+- **Estado:** el proveedor `aws` está en `~> 5.0` (verificado). `required_version` es `>= 1.11` sin techo: es el mínimo del bloqueo nativo de S3 (BP-5), aceptable mientras se use una versión reciente de Terraform. **`.terraform.lock.hcl` se versiona, uno por entorno, con los hashes de `windows_amd64` y `linux_amd64`** (M5, resuelto en código).
 
 ### BP-5. Estado remoto: cifrado, versionado, bloqueo y acceso
 
-- **Regla:** cada cuenta tiene su bucket de estado, con versionado, cifrado, bloqueo de acceso público y política que exija TLS. El `backend "s3"` activa `encrypt = true` y un bloqueo de concurrencia (`use_lockfile = true` en las versiones recientes de Terraform, o una tabla de DynamoDB). **Solo quien despliega puede leerlo**: el estado contiene en claro los valores de `app_env_vars` y el token de GitHub.
+- **Regla:** cada cuenta tiene su bucket de estado, con versionado, cifrado, bloqueo de acceso público y política que exija TLS. El `backend "s3"` activa `encrypt = true` y un bloqueo de concurrencia (`use_lockfile = true`, estable desde Terraform 1.11, o una tabla de DynamoDB). **Solo quien despliega puede leerlo**: el estado contiene en claro los valores de `app_env_vars` y el token de GitHub.
 - **Por qué:** sin bloqueo, dos `apply` a la vez corrompen el estado; sin versionado, un error no se puede deshacer; y quien lea el estado lee los secretos.
-- **Cómo:** `quality-check` avisa de los `backend` sin `encrypt` ni bloqueo (deuda S3). La configuración del bucket de estado depende de la cuenta: **(por confirmar)**.
-- **Estado:** estado remoto en S3, un bucket por cuenta, con versionado activado a mano (verificado en [aws-organizations-setup.md](../aws-organizations-setup.md)). Los `backend.tf` no tienen `encrypt` ni bloqueo (S3). El procedimiento manual no crea el bloqueo de acceso público ni la política TLS del bucket (S4). Quién puede leerlo: **(por confirmar)** (S2).
+- **Cómo:** `quality-check` falla si un `backend` no tiene `encrypt = true` ni bloqueo. Cómo aplicar el cambio y operar el bloqueo: [mantenimiento.md](mantenimiento.md#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo). La configuración del bucket de estado depende de la cuenta: **(por confirmar)**.
+- **Estado:** estado remoto en S3, un bucket por cuenta. Los `backend.tf` activan `encrypt = true` y `use_lockfile = true` (S3, resuelto en código); el efecto real en las cuentas es **(por confirmar)** hasta el `init -reconfigure` de quien aplica. El procedimiento del bucket ya incluye bloqueo de acceso público y política TLS ([aws-organizations-setup.md](../aws-organizations-setup.md#5-crear-los-buckets-de-terraform-state)); dev cumple versionado, bloqueo público y cifrado, y faltan política TLS y etiquetas (31/10/2026); prod está por confirmar (S4 parcial). Quién puede leerlo: **(por confirmar)** (S2).
 
 ### BP-6. Etiquetado
 
@@ -107,7 +107,6 @@ Lo que no se debe imitar y ya está registrado:
 | Nombre del rol de Beanstalk escrito a mano en el módulo de almacenamiento (acopla el módulo a un rol creado fuera de Terraform) | `modules/storage/main.tf` | M3, S7 |
 | `output` que construye una URL con `/` en el nombre de rama | `modules/amplify/outputs.tf` | C8 |
 | Secretos pasados como propiedades de entorno de Beanstalk | `modules/beanstalk/main.tf` | S6 |
-| `.terraform.lock.hcl` ignorado | `.gitignore` | M5 |
 
 ## 2. Estado actual (revisión del 30/09/2026)
 
@@ -116,13 +115,13 @@ Lo que no se debe imitar y ya está registrado:
 | `terraform fmt -check -recursive` | Sin errores (M4, resuelto) |
 | `terraform validate` en `dev` y `prod` | Sin errores |
 | Proveedor `aws` | `~> 5.0` |
-| `required_version` | `>= 1.5` (sin techo) |
-| `.terraform.lock.hcl` versionado | **No** (M5) |
+| `required_version` | `>= 1.11` (sin techo) |
+| `.terraform.lock.hcl` versionado | Sí (M5, resuelto en código) |
 | Entornos que solo componen módulos | Sí |
 | Provisioners o `null_resource` | Ninguno |
 | Variables sin `description` | Ninguna (M7, resuelto) |
 | Secretos en `.tf`, ejemplos y documentos | Ninguno (`quality-check`) |
-| Bloqueo de concurrencia y `encrypt` en el estado | No (S3) |
+| Bloqueo de concurrencia y `encrypt` en el estado | Sí en código (S3); efecto en las cuentas por confirmar hasta el `init -reconfigure` |
 | `prevent_destroy` en el bucket de datos | Sí en código (M6) |
 | Etiqueta `Component` | En todos los recursos etiquetables (M8 resuelto) |
 | Integración continua | `ci.yml` sin credenciales de AWS; escaneo `trivy config` informativo (M9) |

@@ -98,7 +98,7 @@ Cuando el frontend cambia `para-infra.md`, revisa su sección 1 y actualiza los 
 
 ### 3.7 GitHub: CI, plantilla de PR y ajustes que no están en el código
 
-En el código: [ci.yml](../../.github/workflows/ci.yml) ejecuta la definición de terminado (`terraform fmt`, `validate` por entorno, `quality-check`, `docs-check`) sin credenciales de AWS ni `plan`/`apply`; un segundo trabajo con `trivy config` es **informativo** hasta limpiar la línea base de [seguridad.md](seguridad.md) (pasará a bloquear entonces); [pull_request_template.md](../../.github/pull_request_template.md) recoge la misma lista; [dependabot.yml](../../.github/dependabot.yml) actualiza proveedores y acciones cada semana; [CODEOWNERS](../../.github/CODEOWNERS) es una propuesta.
+En el código: [ci.yml](../../.github/workflows/ci.yml) ejecuta la definición de terminado (`terraform fmt`, `validate` por entorno, `quality-check`, `docs-check`) sin credenciales de AWS ni `plan`/`apply`, con Terraform 1.15.5 (la versión del equipo; antes 1.9.8; el mínimo exigido es 1.11, ver [Estado remoto](#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo)); un segundo trabajo con `trivy config` es **informativo** hasta limpiar la línea base de [seguridad.md](seguridad.md) (pasará a bloquear entonces); [pull_request_template.md](../../.github/pull_request_template.md) recoge la misma lista; [dependabot.yml](../../.github/dependabot.yml) actualiza proveedores y acciones cada semana; [CODEOWNERS](../../.github/CODEOWNERS) es una propuesta.
 
 **Ajustes que hay que hacer en GitHub (no se pueden versionar) — (por confirmar) si ya están activos:**
 
@@ -152,10 +152,10 @@ Puerta de calidad y seguridad ([scripts/quality-check.mjs](../../scripts/quality
 | Escáneres opcionales | `tflint`, `trivy config` (alta y crítica) y `checkov`, si están instalados; si no, recomienda instalarlos |
 | Reglas de los `.tf` | `0.0.0.0/0` hacia SSH u otros puertos; buckets sin bloqueo de acceso público, cifrado o versionado; políticas con comodines (`Principal "*"` y `Action` comodín, incluida la forma de lista, solo en sentencias `Allow`: un `Deny` de TLS con `s3:*` y `Principal = "*"` no es una concesión y no falla, ver la excepción de `Deny` en [SEG-4](seguridad.md#seg-4-iam-mínimo-privilegio)); variables sin `type` o `description`; nombres de secreto sin `sensitive = true`; proveedores sin rango acotado; recursos sin `Component`; `provisioner`; `backend` sin `encrypt` ni bloqueo |
 | Secretos | Claves de AWS, claves privadas, tokens de GitHub, hashes bcrypt, ARN e identificadores de cuenta en `.tf`, ejemplos, documentos y scripts |
-| Git | `.tfvars`, `.tfstate`, `.terraform/`, claves o `.env` versionados; `.gitignore`; estado de `.terraform.lock.hcl` |
+| Git | `.tfvars`, `.tfstate`, `.terraform/`, claves o `.env` versionados; `.gitignore`; lockfile versionado por entorno (`.terraform.lock.hcl` no debe estar en `.gitignore`) |
 | Coherencia entre repositorios | Avisos: `VITE_*` de Amplify frente a `.env.example` del frontend, y claves de `app_env_vars` de las plantillas frente a las obligatorias del backend |
 
-**Excepciones aceptadas por escrito:** viven en la constante `KNOWN_DEBT` del script, cada una con el id de su hallazgo en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md). Al resolver un hallazgo, se quita de la constante y se pasa a "Resueltos". Una excepción nueva sin hallazgo registrado no es aceptable. Hoy `KNOWN_DEBT` ya no tiene entradas de `fmt` (M4), `untagged` (M8), `noDescription` (M7, lista `names` vacía) ni `accountIds` (S1): esas claves quedan como objetos o listas vacías solo para conservar la estructura; siguen las de `lockfileIgnored`, `stateBackend` y `buckets`. Para `noDescription`, el script falla si un nombre de la lista ya tiene `description` (hay que quitarlo y pasarlo a "Resueltos"). La regla de las descripciones **solo vigila variables**, no outputs (comprobar los outputs es una propuesta del plan de limpieza, hallazgo D, no implementada). Las recomendaciones de instalar `tflint`, `trivy` y `checkov` son opcionales (**por confirmar** si el equipo los adopta).
+**Excepciones aceptadas por escrito:** viven en la constante `KNOWN_DEBT` del script, cada una con el id de su hallazgo en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md). Al resolver un hallazgo, se quita de la constante y se pasa a "Resueltos". Una excepción nueva sin hallazgo registrado no es aceptable. Hoy `KNOWN_DEBT` ya no tiene entradas de `fmt` (M4), `untagged` (M8), `noDescription` (M7, lista `names` vacía), `accountIds` (S1) ni `stateBackend` (S3): esas claves quedan como objetos o listas vacías solo para conservar la estructura, y la de `lockfileIgnored` (M5) se ha retirado: `quality-check` ya no tiene deuda de backend ni de lockfile y falla si falta `encrypt` o el bloqueo, si `.terraform.lock.hcl` vuelve al `.gitignore` o si algún entorno no tiene su lockfile en el índice de git (`git ls-files`, por eso solo pasa tras añadirlo). Sigue la de `buckets`. Para `noDescription`, el script falla si un nombre de la lista ya tiene `description` (hay que quitarlo y pasarlo a "Resueltos"). La regla de las descripciones **solo vigila variables**, no outputs (comprobar los outputs es una propuesta del plan de limpieza, hallazgo D, no implementada). Las recomendaciones de instalar `tflint`, `trivy` y `checkov` son opcionales (**por confirmar** si el equipo los adopta).
 
 Además, `docs-check` exige que cada guía de `docs/guias/` figure en la tabla "Documentation" del README y en [CLAUDE.md](../../CLAUDE.md).
 
@@ -178,7 +178,19 @@ terraform validate
 
 - **`terraform apply` y `terraform destroy` no se ejecutan sin confirmación expresa** de la persona responsable, y siempre con el perfil de la cuenta correcta.
 - `terraform plan` necesita credenciales y puede imprimir valores sensibles: no pegues su salida en la PR ni en documentos.
-- `.terraform/` y `.terraform.lock.hcl` están en `.gitignore`; no los subas.
+- `.terraform/` está en `.gitignore`; `.terraform.lock.hcl` se versiona, uno por entorno, y se actualiza en una PR propia con `terraform init -upgrade` seguido de `terraform providers lock -platform=windows_amd64 -platform=linux_amd64` (M5, resuelto en código; contiene solo versión, restricción y hashes, sin secretos).
+
+### Estado remoto: aplicar el cambio de backend y operar el bloqueo
+
+Operación recurrente de quien aplica (no es alta de cuentas; el bucket se prepara en [aws-organizations-setup.md](../aws-organizations-setup.md#5-crear-los-buckets-de-terraform-state)). Norma en [BP-5](buenas-practicas-terraform.md#bp-5-estado-remoto-cifrado-versionado-bloqueo-y-acceso) y [SEG-3](seguridad.md#seg-3-el-estado-de-terraform-contiene-secretos). Ningún rol del ciclo ejecuta `init -reconfigure`, `plan`, `apply` ni `force-unlock`.
+
+- **Versión mínima: Terraform >= 1.11.** El bloqueo nativo de S3 (`use_lockfile`) es experimental en la 1.10 y estable desde la 1.11 (27/02/2025). Si `init` falla por una versión antigua, se actualiza Terraform; no se cambia `required_version`. Una versión anterior no conoce el bloqueo nativo y aplicaría sin bloquear; además, el estado escrito por una versión más reciente puede no poder leerlo una anterior (por confirmar). La CI usa Terraform 1.15.5 (`.github/workflows/ci.yml`), la versión del equipo, que cumple el mínimo.
+- **Versiones mezcladas:** una versión sin `use_lockfile`, o que ignore el bloque, aplica sin tomar el bloqueo y el bloqueo nativo no protege contra ella. No hay corrupción por el archivo de bloqueo, pero se pierde la exclusión mutua. `required_version` es la barrera; **durante la transición solo debe aplicar una persona por entorno**.
+- **Aplicar el cambio de backend** (cifrado y bloqueo ya están en `backend.tf`; no cambian bucket, key ni región, por confirmar con la salida real): en `environments/dev`, `AWS_PROFILE=sigmetum-preprod terraform init -reconfigure` y, después, en `environments/prod`, `AWS_PROFILE=sigmetum-prod terraform init -reconfigure`. Nunca `-migrate-state`. **Si `init` pide migrar estado (o responder «yes» a copiar el estado), parar y avisar: no se responde a ciegas.** Después, `terraform plan` sin pegar su salida; se esperan cero cambios de recursos y, si propone alguno, se para.
+- **Archivo de bloqueo en el bucket:** durante `plan` y `apply` aparece un objeto temporal `terraform.tfstate.tflock` junto al estado, que Terraform borra al terminar.
+- **Bloqueo huérfano:** un `apply` interrumpido puede dejar ese objeto y el siguiente comando falla con «Error acquiring the state lock» y un id. Se comprueba que nadie más está aplicando; solo si se confirma, **una persona** ejecuta `terraform force-unlock <id>` con confirmación expresa. Ningún rol del ciclo lo ejecuta y `.claude/settings.json` lo prohíbe.
+- **Permisos de S3** (por confirmar contra la documentación oficial): `s3:ListBucket` sobre el bucket y `s3:GetObject`, `s3:PutObject` y `s3:DeleteObject` sobre el estado y sobre `terraform.tfstate.tflock`; `use_lockfile` no exige versionado (usa escritura condicional de S3). Hoy quien aplica es administrador de SSO (S14); en dev no hay política en el bucket de estado (comprobado el 31/10/2026) y en prod está por confirmar.
+- **Lockfile para Mac:** el archivo trae hashes de `windows_amd64` y `linux_amd64`. Quien use Mac añade su plataforma en una PR propia: `terraform providers lock -platform=darwin_arm64` (o `-platform=darwin_amd64`) en cada entorno.
 
 ### Lo que el script **no** puede comprobar
 
@@ -258,6 +270,7 @@ Los ids no se reutilizan. Si un hallazgo se descarta, se queda con una nota ("No
 
 ### Antes de fusionar la rama
 
+- [ ] Git: lockfile versionado por entorno (`.terraform.lock.hcl`), sin `.terraform/` ni estado.
 - [ ] `node scripts/docs-check.mjs --metrics` y se actualiza la tabla de métricas si cambió alguna cifra.
 - [ ] Fecha y commit del encabezado de [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md).
 - [ ] Los avisos entre repositorios están corregidos o registrados.

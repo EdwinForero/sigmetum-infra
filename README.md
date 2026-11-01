@@ -84,6 +84,8 @@ terraform plan
 terraform apply
 ```
 
+Note: this requires Terraform >= 1.11. The backend uses native S3 locking (`use_lockfile`) and encryption, and the provider lock file is versioned per environment. If you already initialised this environment, run `terraform init -reconfigure` (stop if it asks to migrate state); see [Remote state](docs/guias/mantenimiento.md#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo) in the maintenance guide.
+
 ### Prod
 
 **PowerShell:**
@@ -105,6 +107,8 @@ terraform init
 terraform plan
 terraform apply
 ```
+
+Note: this requires Terraform >= 1.11. The backend uses native S3 locking (`use_lockfile`) and encryption, and the provider lock file is versioned per environment. If you already initialised this environment, run `terraform init -reconfigure` (stop if it asks to migrate state); see [Remote state](docs/guias/mantenimiento.md#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo) in the maintenance guide.
 
 ## Day-to-day operations
 
@@ -173,6 +177,7 @@ Each environment exposes its own outputs; they are listed in [docs/referencia-mo
 | [Spec](docs/specs/2026-10-31-limpieza-deuda-c-design.md), [plan](docs/specs/2026-10-31-limpieza-deuda-c-plan.md) and [PR notice](docs/specs/2026-10-31-limpieza-deuda-c-aviso-pr.md) | Debt cleanup (31/10/2026): unused variables removed, descriptions on all variables and outputs, `app_env_vars` key validation in the beanstalk module, account IDs replaced by markers in two guides (M1, M4, M2, M7, S1); no resource changes |
 | [Spec](docs/specs/2026-10-31-trust-proxy-hops-design.md), [plan](docs/specs/2026-10-31-trust-proxy-hops-plan.md) and [PR notice](docs/specs/2026-10-31-trust-proxy-hops-aviso-pr.md) | `TRUST_PROXY_HOPS` and dev origin restriction (31/10/2026): optional `app_env_vars` key measured in dev (`backend:I7` still open, prod to be confirmed) and a dev-only security group that admits port 80 only from CloudFront (S17) |
 | [Spec](docs/specs/2026-10-31-m2-node-env-react-design.md), [plan](docs/specs/2026-10-31-m2-node-env-react-plan.md) and [PR notice](docs/specs/2026-10-31-m2-node-env-react-aviso-pr.md) | M2 reopened: `NODE_ENV` removed from Amplify; React in production mode |
+| [Spec](docs/specs/2026-10-31-estado-remoto-design.md), [plan](docs/specs/2026-10-31-estado-remoto-plan.md) and [PR notice](docs/specs/2026-10-31-estado-remoto-aviso-pr.md) | Remote state, versions and lock file (31/10/2026): `encrypt` and native S3 locking in both backends, Terraform >= 1.11, CI on 1.15.5, versioned lock files (S3 and M5 resolved in code; S4 partial) |
 
 ## CI and GitHub
 

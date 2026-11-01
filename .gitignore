@@ -1,6 +1,5 @@
-# Terraform state and lock files
+# Terraform state and local plugin cache; the provider lock file is versioned (BP-4)
 .terraform/
-.terraform.lock.hcl
 *.tfstate
 *.tfstate.backup
 *.tfstate.*.backup

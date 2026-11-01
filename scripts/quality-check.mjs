@@ -37,10 +37,8 @@ const check = (name, problems, notes = []) => results.push({ name, problems, not
 const KNOWN_DEBT = {
   // terraform fmt: archivos que hoy no pasan — M4 resuelto; no queda ninguno, objeto vacío retenido para estructura
   fmt: {},
-  // .terraform.lock.hcl ignorado por git
-  lockfileIgnored: 'M5 (la práctica recomendada es versionarlo)',
-  // bloque backend "s3" sin cifrado explícito ni bloqueo de concurrencia
-  stateBackend: { dev: 'S3', prod: 'S3' },
+  // bloque backend "s3" sin cifrado explícito ni bloqueo de concurrencia: S3 resuelto; objeto vacío retenido para estructura
+  stateBackend: {},
   // buckets: política TLS, registros de acceso y prevent_destroy (TLS y prevent_destroy de storage resueltos; queda S5 logging)
   buckets: {
     'modules/storage:app': { logging: 'S5' },
@@ -352,7 +350,7 @@ const outputs = tfFiles
     for (const entry of ['terraform.tfvars', '*.tfstate', '.terraform/']) if (!ignore.includes(entry)) problems.push(`.gitignore no incluye ${entry}`);
     const lockIgnored = ignore.includes('.terraform.lock.hcl');
     const locks = tracked.filter((f) => f.endsWith('.terraform.lock.hcl'));
-    if (lockIgnored) notes.push(`.terraform.lock.hcl está en .gitignore: deuda conocida ${KNOWN_DEBT.lockfileIgnored}`);
+    if (lockIgnored) problems.push('.terraform.lock.hcl no debe estar en .gitignore (BP-4)');
     else if (locks.length < environments.length) problems.push('.terraform.lock.hcl debe versionarse en cada entorno (terraform init y git add)');
   }
   check('Secretos y archivos que no deben versionarse', problems, notes);
