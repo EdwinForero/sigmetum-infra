@@ -16,10 +16,10 @@ Este documento dice **qué hay que revisar y actualizar después de cada cambio 
 
 | Si cambias... | Actualiza | Comprueba |
 |---|---|---|
-| Un **módulo** nuevo, renombrado o eliminado | Bloque "Architecture" y tabla del [README](../../README.md), sección "Módulo ..." de [referencia-modulos.md](../referencia-modulos.md), métricas de [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md#métricas) | Lo usa algún entorno; `docs-check` lo valida |
+| Un **módulo** nuevo, renombrado o eliminado | Bloque "Arquitectura" y tabla del [README](../../README.md), sección "Módulo ..." de [referencia-modulos.md](../referencia-modulos.md), métricas de [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md#métricas) | Lo usa algún entorno; `docs-check` lo valida |
 | Un **módulo existente** (recursos nuevos o quitados) | Sección del módulo en [referencia-modulos.md](../referencia-modulos.md), tabla del README si cambia un nombre, etiqueta o tamaño | Las etiquetas `Component` siguen en [billing-tags.md](../billing-tags.md) |
 | **Variables o outputs** de un módulo o entorno | [referencia-modulos.md](../referencia-modulos.md) (tablas "Variables" y "Outputs", con "Por defecto" correcto) | `environments/*/terraform.tfvars.example` si es una variable obligatoria del entorno; `sensitive = true` si es un secreto |
-| Un **entorno** nuevo | Bloque "Architecture", tabla del README, sección "Entorno ..." de la referencia, guías de [terraform-setup.md](../terraform-setup.md) y [aws-organizations-setup.md](../aws-organizations-setup.md) | Su `terraform.tfvars.example`, `providers.tf` y `backend.tf` |
+| Un **entorno** nuevo | Bloque "Arquitectura", tabla del README, sección "Entorno ..." de la referencia, guías de [terraform-setup.md](../terraform-setup.md) y [aws-organizations-setup.md](../aws-organizations-setup.md) | Su `terraform.tfvars.example`, `providers.tf` y `backend.tf` |
 | El **`build_spec`**, las reglas o las variables de **Amplify** | "Variables de Amplify" en [referencia-modulos.md](../referencia-modulos.md) y secciones 2, 3 y 6 de `para-infra.md` del frontend (ver sección 3 de este documento) | Node, `baseDirectory` y caché coinciden con lo que necesita el frontend |
 | Un **ajuste de Beanstalk** (balanceador, health check, tipo de instancia, despliegue, SSH) | README (tabla de recursos) y sección "Módulo beanstalk"; [billing-tags.md](../billing-tags.md) si cambia el coste | El health check coincide con la ruta del backend; el coste mensual |
 | **`app_env_vars`** (añadir, quitar o renombrar una clave) | Tabla `app_env_vars` de [referencia-modulos.md](../referencia-modulos.md), las dos plantillas `terraform.tfvars.example` | Las claves obligatorias de `../sigmetum-backend/config/validateEnv.js`; **contrato**, ver sección 3 |
@@ -27,17 +27,17 @@ Este documento dice **qué hay que revisar y actualizar después de cada cambio 
 | **DNS** o dominios (Route53, dominio de Amplify, certificado) | README (fila DNS), "Módulo dns", secciones 4 y 7 de `para-infra.md` | `ALLOWED_ORIGIN` del backend y `VITE_BASE_URL` del frontend; región del certificado |
 | La **región** o la **cuenta** (proveedor, estado remoto, perfiles SSO) | `providers.tf`, `backend.tf`, README (fila Region), [aws-cli-setup.md](../aws-cli-setup.md), [aws-organizations-setup.md](../aws-organizations-setup.md), plantillas `.example` | `AWS_REGION` en `app_env_vars` y el ARN de ACM están en la misma región |
 | **Costes** (tipo de instancia, ALB, autoescalado, etiquetas) | README (tabla), [billing-tags.md](../billing-tags.md) | Etiquetas `Project`, `Environment`, `ManagedBy`, `Component` |
-| **Secretos** o cómo se gestionan | README (sección "Secrets"), [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) (S2) | `sensitive = true`, `.gitignore`, ningún valor en plantillas |
+| **Secretos** o cómo se gestionan | README (sección "Secretos y valores sensibles"), [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) (S2) | `sensitive = true`, `.gitignore`, ningún valor en plantillas |
 | La **versión** de Terraform, del proveedor o de la plataforma de Beanstalk | `providers.tf`, [terraform-setup.md](../terraform-setup.md), "Módulo beanstalk" | La versión de Node de la plataforma sirve al backend y al build del frontend |
 | Una **regla de las guías** (`docs/guias/`), o cualquier `.tf` que la incumpla o la cambie | La guía afectada ([buenas-practicas-terraform.md](buenas-practicas-terraform.md) o [seguridad.md](seguridad.md)): su regla y su tabla de estado | `node scripts/quality-check.mjs`; la deuda nueva en `KNOWN_DEBT` y en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) |
 | **IAM, S3, secretos, red, TLS, Amplify** o una variable sensible | [seguridad.md](seguridad.md) (regla, tabla de estado y lista de PR) y [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) | Ningún secreto ni identificador de cuenta; `sensitive = true`; sin permisos comodín |
-| Una **guía nueva** en `docs/guias/` | Tabla "Documentation" del README y la tabla "Antes de empezar" de [CLAUDE.md](../../CLAUDE.md) | `docs-check` exige las dos |
+| Una **guía nueva** en `docs/guias/` | Tabla "Documentación" del README y la tabla "Antes de empezar" de [CLAUDE.md](../../CLAUDE.md) | `docs-check` exige las dos |
 | Una **guía de puesta en marcha** (`docs/aws-*.md`, `terraform-setup.md`, `iam-role-setup.md`) | La propia guía y, si cambia un comando o una ruta, el README | `docs-check` valida los enlaces; los comandos se revisan a mano |
 | Un **hallazgo** resuelto o nuevo | [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) (ciclo en la sección 5) | Si venía de `para-infra.md`, avisar al frontend (sección 3) |
-| **Documentos** nuevos, renombrados o movidos | Tabla "Documentation" del README | `docs-check` valida los enlaces y que todo `docs/*.md` esté enlazado |
+| **Documentos** nuevos, renombrados o movidos | Tabla "Documentación" del README | `docs-check` valida los enlaces y que todo `docs/*.md` esté enlazado |
 | **`.claude/**`** (`flujo.json`, `settings.json`) o **`plugins/**`** (ciclo agéntico y skills locales) | [plugins/README.md](../../plugins/README.md) (única lista de plugins y skills) y la sección "Ciclo de desarrollo" de [CLAUDE.md](../../CLAUDE.md); [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) (iteración fechada) | `node plugins/ciclo-agentico/scripts/docs-gate.mjs --solo-validar` y `node --test "plugins/**/tests/**/*.test.mjs"`; `settings.json` conserva todas las reglas `deny` y su `enabledPlugins` desactiva los plugins de otros repositorios; tras cambiar un plugin local, "Tras cambiar un plugin local" de `plugins/README.md` |
 | Los **scripts** `scripts/docs-check.mjs` o `scripts/quality-check.mjs` | Sección 4 de este documento | Que sigue detectando deriva (provocar un fallo y revertirlo) |
-| Un **script nuevo** en `scripts/` | Fila en la tabla "Documentation" del README, esta sección 2 y la sección 4 (qué hace, cómo se prueba y si exige entrada en `quality-check`, `docs-check` o `docsPorArea`); `scripts/**` ya pide este documento | Que pasa `quality-check` (sin ARN ni números de 12 dígitos); su prueba, si la tiene (`node --test scripts/<nombre>.test.mjs`); un script que llame a AWS nunca lo ejecuta un rol del ciclo |
+| Un **script nuevo** en `scripts/` | Fila en la tabla "Documentación" del README, esta sección 2 y la sección 4 (qué hace, cómo se prueba y si exige entrada en `quality-check`, `docs-check` o `docsPorArea`); `scripts/**` ya pide este documento | Que pasa `quality-check` (sin ARN ni números de 12 dígitos); su prueba, si la tiene (`node --test scripts/<nombre>.test.mjs`); un script que llame a AWS nunca lo ejecuta un rol del ciclo |
 
 ## 3. Contrato con el frontend y el backend (convención entre repositorios)
 
@@ -116,8 +116,8 @@ El script ([scripts/docs-check.mjs](../../scripts/docs-check.mjs)) no tiene depe
 | Comprobación | Código | Documento |
 |---|---|---|
 | Enlaces y anclas internos | Todos los `.md` | Los propios `.md` |
-| Índice de documentos | `docs/*.md` | Tabla "Documentation" del README |
-| Módulos y entornos | `modules/*`, `environments/*` y `source` de cada entorno | Bloque "Architecture" del README y secciones de la referencia |
+| Índice de documentos | `docs/*.md` | Tabla "Documentación" del README |
+| Módulos y entornos | `modules/*`, `environments/*` y `source` de cada entorno | Bloque "Arquitectura" del README y secciones de la referencia |
 | Tabla de recursos | Nombres, rama, tipo de instancia, balanceador, HTTPS, DNS y región | Tabla del README |
 | Variables y outputs | `variables.tf` y `outputs.tf` (nombres y si tienen `default`) | [referencia-modulos.md](../referencia-modulos.md) |
 | Plantillas de valores | `terraform.tfvars.example` (claves, región, ARN de ACM, bucket) | Referencia y proveedor |
@@ -157,7 +157,7 @@ Puerta de calidad y seguridad ([scripts/quality-check.mjs](../../scripts/quality
 
 **Excepciones aceptadas por escrito:** viven en la constante `KNOWN_DEBT` del script, cada una con el id de su hallazgo en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md). Al resolver un hallazgo, se quita de la constante y se pasa a "Resueltos". Una excepción nueva sin hallazgo registrado no es aceptable. Hoy `KNOWN_DEBT` ya no tiene entradas de `fmt` (M4), `untagged` (M8), `noDescription` (M7, lista `names` vacía), `accountIds` (S1) ni `stateBackend` (S3): esas claves quedan como objetos o listas vacías solo para conservar la estructura, y la de `lockfileIgnored` (M5) se ha retirado: `quality-check` ya no tiene deuda de backend ni de lockfile y falla si falta `encrypt` o el bloqueo, si `.terraform.lock.hcl` vuelve al `.gitignore` o si algún entorno no tiene su lockfile en el índice de git (`git ls-files`, por eso solo pasa tras añadirlo). Sigue la de `buckets`, que ya no contiene la excepción de registros de acceso del bucket de datos (`modules/storage:app`, S5, resuelta: ese bucket tiene `aws_s3_bucket_logging`) ni la obsoleta `modules/backend-ci-iam:deploys`; hoy solo queda `modules/storage:access_logs` con `logging: 'M15'`: el bucket de logs de acceso no se registra a sí mismo, para evitar el bucle de logs sobre logs, y la regla `logging` lo trata como nota de deuda conocida, no como fallo. Fragilidad: la regla `logging` da un bucket por registrado si algún `aws_s3_bucket_logging` del mismo directorio contiene en su texto (comentarios incluidos) la cadena `aws_s3_bucket.<etiqueta>.`; por eso el `aws_s3_bucket_logging` del bucket de datos usa `local.access_logs_bucket` y no debe escribir `aws_s3_bucket.access_logs.` en ningún sitio, o `access_logs` pasaría a contar como registrado sin estarlo y la excepción M15 quedaría oculta. Para `noDescription`, el script falla si un nombre de la lista ya tiene `description` (hay que quitarlo y pasarlo a "Resueltos"). La regla de las descripciones **solo vigila variables**, no outputs (comprobar los outputs es una propuesta del plan de limpieza, hallazgo D, no implementada). Las recomendaciones de instalar `tflint`, `trivy` y `checkov` son opcionales (**por confirmar** si el equipo los adopta).
 
-Además, `docs-check` exige que cada guía de `docs/guias/` figure en la tabla "Documentation" del README y en [CLAUDE.md](../../CLAUDE.md).
+Además, `docs-check` exige que cada guía de `docs/guias/` figure en la tabla "Documentación" del README y en [CLAUDE.md](../../CLAUDE.md).
 
 ### Otros scripts de `scripts/`
 
@@ -229,7 +229,7 @@ Los ids no se reutilizan. Si un hallazgo se descarta, se queda con una nota ("No
 
 ### Módulo nuevo o modificado
 
-- [ ] Está en el bloque "Architecture" del README y tiene sección en la referencia, con sus variables y outputs.
+- [ ] Está en el bloque "Arquitectura" del README y tiene sección en la referencia, con sus variables y outputs.
 - [ ] Lo usa algún entorno, y los dos entornos siguen alineados (o la diferencia se explica en el README).
 - [ ] Tiene etiqueta `Component` si crea recursos que se facturan, y figura en [billing-tags.md](../billing-tags.md).
 - [ ] `terraform fmt -check -recursive`, `terraform validate`, `quality-check` y `docs-check` en verde.

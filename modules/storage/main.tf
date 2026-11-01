@@ -128,7 +128,12 @@ resource "aws_cloudfront_distribution" "app" {
   tags = { Component = "storage" }
 }
 
-resource "aws_s3_bucket_policy" "cloudfront_oac" {
+moved {
+  from = aws_s3_bucket_policy.cloudfront_oac
+  to   = aws_s3_bucket_policy.app
+}
+
+resource "aws_s3_bucket_policy" "app" {
   bucket = aws_s3_bucket.app.id
 
   policy = jsonencode({

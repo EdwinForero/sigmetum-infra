@@ -247,7 +247,7 @@ check(
 // 3. Módulos y entornos frente a la arquitectura del README ───────────────────────────────────────
 {
   const problems = [];
-  const lines = (/^## Architecture\s*\n+```[^\n]*\n([\s\S]*?)```/m.exec(docs['README.md'])?.[1] ?? '').split('\n');
+  const lines = (/^## Arquitectura\s*\n+```[^\n]*\n([\s\S]*?)```/m.exec(docs['README.md'])?.[1] ?? '').split('\n');
   const listed = { environments: new Set(), modules: new Set() };
   let parent;
   for (const line of lines) {
@@ -257,7 +257,7 @@ check(
     if (item) listed[parent].add(item[1]);
   }
   for (const [kind, actual] of [['modules', modules], ['environments', environments]]) {
-    setDiff(new Set(actual), listed[kind]).forEach((name) => problems.push(`${kind}/${name} no aparece en el bloque "Architecture" del README`));
+    setDiff(new Set(actual), listed[kind]).forEach((name) => problems.push(`${kind}/${name} no aparece en el bloque "Arquitectura"del README`));
     setDiff(listed[kind], new Set(actual)).forEach((name) => problems.push(`El README menciona ${kind}/${name}, que no existe`));
   }
   const used = new Set();
@@ -276,7 +276,7 @@ check(
 // 4. Tabla de recursos del README frente al código ───────────────────────────────────────────────
 {
   const problems = [];
-  const rows = tableRows(/^\| Resource \|[\s\S]*?(?=\n\n)/m.exec(docs['README.md'])?.[0]);
+  const rows = tableRows(/^\| Recurso \|[\s\S]*?(?=\n\n)/m.exec(docs['README.md'])?.[0]);
   const header = (rows[0] ?? []).map((cell) => cell.toLowerCase());
   const plain = (cell) => (cell ?? '').replace(/`/g, '');
   const cellFor = (label, env) => plain(rows.find((row) => row[0] === label)?.[header.indexOf(env)]);
@@ -297,23 +297,23 @@ check(
     const sub = (template) => template?.replace('${var.environment}', env).replace('${var.app_name}', appDefault);
     const beanstalkBody = moduleBody(env, 'beanstalk');
     const amplifyBody = moduleBody(env, 'amplify');
-    expect('Beanstalk app', sub(nameOf(beanstalk, 'aws_elastic_beanstalk_application')));
-    expect('Beanstalk env', sub(nameOf(beanstalk, 'aws_elastic_beanstalk_environment')));
-    expect('S3 bucket', examples[env]?.value('bucket_name') ?? '(sin ejemplo)');
-    expect('Amplify app', sub(nameOf(amplify, 'aws_amplify_app')));
-    expect('Amplify branch', strArg(amplifyBody, 'branch'));
+    expect('App de Beanstalk', sub(nameOf(beanstalk, 'aws_elastic_beanstalk_application')));
+    expect('Entorno de Beanstalk', sub(nameOf(beanstalk, 'aws_elastic_beanstalk_environment')));
+    expect('Bucket de S3', examples[env]?.value('bucket_name') ?? '(sin ejemplo)');
+    expect('App de Amplify', sub(nameOf(amplify, 'aws_amplify_app')));
+    expect('Rama de Amplify', strArg(amplifyBody, 'branch'));
     const type = strArg(beanstalkBody, 'instance_type');
     const max = Number(/max_instances\s*=\s*(\d+)/.exec(beanstalkBody)?.[1] ?? 1);
     const min = Number(/min_instances\s*=\s*(\d+)/.exec(beanstalkBody)?.[1] ?? 1);
-    expect('Instance type', type, (cell) => cell.startsWith(type) && (max === 1 || cell.includes(`${min}–${max}`)));
+    expect('Tipo de instancia', type, (cell) => cell.startsWith(type) && (max === 1 || cell.includes(`${min}–${max}`)));
     const lb = strArg(beanstalkBody, 'load_balancer_type');
-    expect('Load balancer', lb, (cell) => (lb === 'single' ? /none/i.test(cell) : /ALB/.test(cell)));
+    expect('Balanceador', lb, (cell) => (lb === 'single' ? /ninguno/i.test(cell) : /ALB/.test(cell)));
     const https = /ssl_certificate_arn\s*=/.test(beanstalkBody ?? '');
-    expect('HTTPS', https ? 'Yes' : 'No', (cell) => (https ? /yes/i.test(cell) : /^no/i.test(cell)));
+    expect('HTTPS', https ? 'Sí' : 'No', (cell) => (https ? /^s[ií]/i.test(cell) : /^no/i.test(cell)));
     const dnsBody = moduleBody(env, 'dns');
     const fqdn = dnsBody ? `backend.${strArg(dnsBody, 'zone_name')}` : '—';
     expect('DNS', fqdn);
-    expect('Region', providerRegion(env));
+    expect('Región', providerRegion(env));
   }
   check('Tabla de recursos (README → código)', problems);
 }

@@ -235,4 +235,4 @@ aws iam add-role-to-instance-profile --instance-profile-name aws-elasticbeanstal
 
 ## Siguiente paso
 
-Con las cuentas creadas y los roles listos, sigue con el deploy en [README.md](../README.md#first-time-deploy).
+Con las cuentas creadas y los roles listos, sigue con el deploy en [README.md](../README.md#primer-despliegue).

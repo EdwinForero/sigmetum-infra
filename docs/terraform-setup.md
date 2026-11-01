@@ -118,4 +118,4 @@ terraform apply
 
 ## Siguiente paso
 
-Con Terraform instalado y el perfil AWS activo, sigue con el [primer deploy del README](../README.md#first-time-deploy).
+Con Terraform instalado y el perfil AWS activo, sigue con el [primer deploy del README](../README.md#primer-despliegue).

@@ -371,7 +371,7 @@ const outputs = tfFiles
     for (const env of environments) {
       const keys = exampleKeys(env);
       required.filter((key) => !keys.has(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example no define ${key}, que el backend exige al arrancar`));
-      [...keys].filter((key) => !required.includes(key) && !['PORT'].includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example define ${key}, que el backend no exige (¿sobra?)`));
+      [...keys].filter((key) => !required.includes(key) && !['PORT', 'TRUST_PROXY_HOPS'].includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example define ${key}, que el backend no exige (¿sobra?)`));
     }
   }
   const envExample = join(FRONTEND, '.env.example');

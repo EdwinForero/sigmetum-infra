@@ -1,4 +1,4 @@
-# IAM Role Setup — Terraform Deploy Role
+# Configuración del rol IAM — rol de despliegue de Terraform
 
 > **Este doc ya no aplica al setup actual.**
 >
@@ -21,31 +21,31 @@ Este enfoque (rol manual + `assume_role`) es útil si en el futuro quieres corre
 
 ---
 
-## Before you start — set the correct region
+## Antes de empezar: comprueba la región
 
-> **Every time you open the AWS Console, verify the region in the top-right corner is set to `eu-west-3` (Paris) before doing anything.**
+> **Cada vez que abras la consola de AWS, comprueba que la región de la esquina superior derecha es `eu-west-3` (París) antes de hacer nada.**
 
 ---
 
-## 1. Create the role
+## 1. Crear el rol
 
-1. Open **IAM** → **Roles** → **Create role**
+1. Abre **IAM** → **Roles** → **Create role**
 2. **Trusted entity type:** AWS account
-3. Enter the account ID that will assume the role (management or CI account)
-4. Click **Next**
+3. Introduce el ID de la cuenta que asumirá el rol (cuenta de gestión o de CI)
+4. Pulsa **Next**
 
 ---
 
-## 2. Attach permissions
+## 2. Asignar permisos
 
-- Search for `AdministratorAccess` → check it → **Next**
+- Busca `AdministratorAccess` → márcalo → **Next**
 
 ---
 
-## 3. Name and create
+## 3. Nombrar y crear
 
-- **Role name:** `sigmetum-terraform-role`
-- **Description:** Terraform deploy role for Sigmetum infrastructure
+- **Nombre del rol:** `sigmetum-terraform-role`
+- **Descripción:** rol de despliegue de Terraform para la infraestructura de Sigmetum
 - **Tags:**
   - `Project` = `sigmetum`
   - `ManagedBy` = `manual`
@@ -53,9 +53,9 @@ Este enfoque (rol manual + `assume_role`) es útil si en el futuro quieres corre
 
 ---
 
-## 4. Wire it up in Terraform
+## 4. Conectarlo en Terraform
 
-Add `assume_role` to `providers.tf`:
+Añade `assume_role` a `providers.tf`:
 
 ```hcl
 provider "aws" {

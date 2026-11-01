@@ -51,7 +51,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `endpoint_url` | CNAME del entorno de Beanstalk (sin esquema) |
 | `environment_name` | Nombre del entorno |
 | `application_name` | Nombre de la aplicación |
-| `load_balancers` | Balanceadores asociados al entorno |
+| `load_balancers` | Balanceadores del entorno (en un ALB, el ARN; **por confirmar**) |
 | `backend_cdn_url` | URL HTTPS de CloudFront del backend (vacío cuando `enable_cdn = false`; usar como `backend_url` en dev) |
 
 ### Listener HTTPS y redirección 80 a 443
@@ -78,9 +78,9 @@ Bucket S3 privado con versionado y cifrado, distribución CloudFront con OAC par
 
 ### Políticas y protección del bucket
 
-- **Política del bucket** (`aws_s3_bucket_policy.cloudfront_oac`; el nombre se conserva por compatibilidad con el estado, ver M12): dos sentencias. `AllowCloudFrontOAC` da `s3:GetObject` a CloudFront solo sobre `assets/*` y solo a la distribución del módulo (`AWS:SourceArn`). `DenyInsecureTransport` deniega `s3:*` a `Principal = "*"` sobre el bucket y sus objetos cuando `aws:SecureTransport` es `false`; solo restringe, no concede.
+- **Política del bucket** (`aws_s3_bucket_policy.app`; un bloque `moved` la renombra desde `cloudfront_oac` sin tocar el recurso en AWS, ver M12): dos sentencias. `AllowCloudFrontOAC` da `s3:GetObject` a CloudFront solo sobre `assets/*` y solo a la distribución del módulo (`AWS:SourceArn`). `DenyInsecureTransport` deniega `s3:*` a `Principal = "*"` sobre el bucket y sus objetos cuando `aws:SecureTransport` es `false`; solo restringe, no concede.
 - **Política IAM del rol de instancias** (`aws_iam_role_policy.beanstalk_s3`): `ObjectsInGalleryAndData` (`s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` sobre `gallery/*` y `data/*`) y `ListGalleryAndData` (`s3:ListBucket` sobre el bucket con `StringLike` en `s3:prefix` para `gallery/*` y `data/*`). Un listado sin `Prefix`, de la raíz o de `assets/` queda denegado, igual que leer o escribir en `assets/`.
-- **`prevent_destroy = true`** en `aws_s3_bucket.app`: `terraform destroy` falla mientras esté (ver el procedimiento de vaciado en el [README](../README.md#destroy-an-environment)).
+- **`prevent_destroy = true`** en `aws_s3_bucket.app`: `terraform destroy` falla mientras esté (ver el procedimiento de vaciado en el [README](../README.md#destruir-un-entorno)).
 - **Ciclo de vida** (`aws_s3_bucket_lifecycle_configuration.app`): `expire-noncurrent-versions` expira las versiones no actuales a los 180 días y limpia los marcadores de borrado huérfanos; `abort-incomplete-multipart` aborta las subidas multipart incompletas a los 7 días. Las versiones vigentes no caducan.
 - **Bucket de logs de acceso** (`aws_s3_bucket.access_logs`, nombre `sigmetum-access-logs-<entorno>`, uno por entorno, sin variable nueva): recibe los registros de acceso de S3 del bucket de datos (prefijo `app-data/`, `aws_s3_bucket_logging.app`) y del bucket de staging de Beanstalk (prefijo `beanstalk-staging/`, ver [backend-ci-iam](#módulo-backend-ci-iam)). Recursos: el bucket (con `prevent_destroy = true`), `aws_s3_bucket_public_access_block.access_logs`, `aws_s3_bucket_server_side_encryption_configuration.access_logs` (AES256), `aws_s3_bucket_versioning.access_logs`, `aws_s3_bucket_ownership_controls.access_logs` (`BucketOwnerEnforced`, sin ACL), `aws_s3_bucket_lifecycle_configuration.access_logs` y `aws_s3_bucket_policy.access_logs`.
 - **Política del bucket de logs** (`aws_s3_bucket_policy.access_logs`): `S3ServerAccessLogsDelivery` da `s3:PutObject` a `logging.s3.amazonaws.com` solo sobre `app-data/*` y `beanstalk-staging/*`, con las condiciones `aws:SourceArn` (el bucket de datos y el de staging) y `aws:SourceAccount` (la cuenta, por data source); `DenyInsecureTransport` deniega `s3:*` sin TLS. Depende del bloqueo público, la propiedad de objetos, el cifrado y el versionado para no escribir en paralelo sobre el bucket.

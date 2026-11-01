@@ -91,7 +91,7 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 - **Por qué:** el token personal clásico con alcance `repo` da acceso de lectura y escritura a **todos** los repositorios de quien lo creó.
 - **Regla:** preferir una **GitHub App** (la integración oficial de Amplify) o, como mínimo, un token de alcance mínimo sobre el repositorio del frontend; rotarlo periódicamente y retirarlo de la cuenta personal de quien se marcha.
 - **Cómo:** manual. `access_token` es `sensitive = true`.
-- **Estado:** el [README](../../README.md#2-github-personal-access-token) pide un token clásico con alcance `repo` (verificado) (S10).
+- **Estado:** el [README](../../README.md#2-token-de-acceso-personal-de-github) pide un token clásico con alcance `repo` (verificado) (S10).
 
 ### SEG-11. Varias cuentas, facturación y auditoría
 

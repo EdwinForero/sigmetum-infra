@@ -71,7 +71,7 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 - **Regla:** los recursos con datos que no se pueden recrear (bucket de datos, bucket de estado) llevan `prevent_destroy = true` o una protección equivalente. `force_destroy` no se activa. Un `terraform destroy` exige vaciar el bucket a mano, a propósito.
 - **Por qué:** un `destroy` o un cambio de nombre que fuerce el reemplazo borraría la investigación subida por el equipo.
 - **Cómo:** `quality-check` avisa de los buckets sin `prevent_destroy`.
-- **Estado:** el bucket de datos tiene `prevent_destroy = true` en `modules/storage/main.tf` (M6 resuelto en código, verificado): `destroy` falla en ambos entornos hasta que se quite de forma revisada ([README](../../README.md#destroy-an-environment) explica el vaciado manual). No tiene `force_destroy`. El bucket de estado no lo gestiona Terraform (M3).
+- **Estado:** el bucket de datos tiene `prevent_destroy = true` en `modules/storage/main.tf` (M6 resuelto en código, verificado): `destroy` falla en ambos entornos hasta que se quite de forma revisada ([README](../../README.md#destruir-un-entorno) explica el vaciado manual). No tiene `force_destroy`. El bucket de estado no lo gestiona Terraform (M3).
 
 ### BP-9. Costes
 

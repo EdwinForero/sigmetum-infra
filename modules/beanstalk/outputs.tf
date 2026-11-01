@@ -14,7 +14,7 @@ output "application_name" {
 }
 
 output "load_balancers" {
-  description = "List of load balancer hostnames attached to the environment"
+  description = "Load balancers of the environment (an ARN for an ALB, to be confirmed)"
   value       = aws_elastic_beanstalk_environment.this.load_balancers
 }
 
