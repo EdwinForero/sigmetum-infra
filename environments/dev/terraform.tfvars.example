@@ -26,20 +26,15 @@ app_env_vars = {
   # Nombre del bucket S3 — debe coincidir con bucket_name de arriba.
   AWS_BUCKET_NAME = "sigmetum-app-assets-dev"
 
-  # Clave secreta para firmar los JWT. Genera con: openssl rand -hex 32
-  # Usa un valor distinto en prod.
-  JWT_SECRET = "CHANGE_ME_openssl_rand_hex_32"
+  # Secretos (no van aquí): JWT_SECRET, ADMIN_PASSWORD y EMAIL_PASSWORD viven en Parameter Store
+  # como SecureString, en /sigmetum/dev/backend/<CLAVE>. Se crean a mano; Terraform no lee ni escribe
+  # su valor. Procedimiento: docs/integracion/para-backend.md (sección «Secretos en Parameter Store: procedimiento humano»). La validation de app_env_vars rechaza las tres claves.
 
   # Duración del token JWT (ej. "10m", "1h", "7d").
   JWT_EXPIRATION = "10m"
 
   # Usuario del administrador inicial del sistema.
   ADMIN_USERNAME = "CHANGE_ME_admin_user"
-
-  # Hash bcrypt del password del admin. NUNCA el texto en claro.
-  # Genera con: node -e "require('bcryptjs').hash('tupassword',10).then(console.log)"
-  # (npm install -g bcryptjs si no lo tienes)
-  ADMIN_PASSWORD = "CHANGE_ME_bcrypt_hash"
 
   # Origen exacto del frontend, sin barra final. Usado para CORS.
   # Primera vuelta de apply: deja vacío (""). Amplify genera la URL tras el apply;
@@ -49,10 +44,6 @@ app_env_vars = {
 
   # Cuenta de correo desde la que el backend envía emails.
   EMAIL = "tu@email.com"
-
-  # Contraseña de aplicación de Gmail (no la de tu cuenta).
-  # Genera en: Google → Cuenta → Seguridad → Verificación en dos pasos → Contraseñas de aplicación
-  EMAIL_PASSWORD = "CHANGE_ME_app_password"
 
   # Saltos de proxy delante de Express (cadena entera de 1 a 5, sin espacios ni ceros a la izquierda).
   # Opcional en el backend (1 si no se define; en dev 1 es incorrecto). En dev se midió lo que recibe nginx; para Express es deducido: CloudFront, nginx, Express = 2.

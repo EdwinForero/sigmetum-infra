@@ -42,7 +42,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `ssh_key_name` | string | `""` | Par de claves EC2; vacío desactiva SSH |
 | `ssh_allowed_cidrs` | list(string) | `[]` | CIDR con acceso SSH; solo aplica si hay `ssh_key_name` |
 | `notification_email` | string | — | Correo de las notificaciones SNS del entorno |
-| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible). Claves en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` las nueve claves obligatorias (por nombre, no por valor) y acepta claves extra |
+| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible). Solo claves no secretas, en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` las seis claves obligatorias no secretas (por nombre, no por valor), acepta claves extra y **rechaza** `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD`, que llegan de [Parameter Store](#secretos-en-parameter-store) |
 
 ### Outputs
 
@@ -70,7 +70,7 @@ La condición `local.restrict_origin` (`enable_cdn` y `load_balancer_type = "sin
 | `aws_vpc_security_group_ingress_rule.origin_remote_access` | Acceso remoto desde `ssh_allowed_cidrs`, solo si `ssh_key_name` no está vacío (en `dev` está desactivado: no se crea) |
 | `aws_vpc_security_group_egress_rule.origin_all` | Salida abierta a todo: el backend sale a S3, a los endpoints de Beanstalk y al SMTP en otros puertos; es la misma apertura que ya tenía el grupo que crea Beanstalk |
 
-`prod` no cambia: el ALB tiene su propio grupo gestionado por Beanstalk y el recuento de estos recursos es cero (que el ALB no necesite este cambio, por confirmar). Cambiar `SecurityGroups` modifica la plantilla de lanzamiento y la instancia de `dev` se reemplaza: unos minutos de corte (por confirmar). La lista de prefijos cuenta como una regla por entrada y la cuota por defecto del grupo puede quedarse justa: si el `apply` falla con `RulesPerSecurityGroupLimitExceeded`, hay que pedir un aumento en Service Quotas (por confirmar). Si tras el `apply` un `curl` directo al CNAME sigue dando `200`, se revierte (puerta de decisión de S17).
+`prod` no cambia en este punto: el ALB tiene su propio grupo gestionado por Beanstalk y el recuento de estos recursos es cero (que el ALB no necesite este cambio, por confirmar). Cambiar `SecurityGroups` modifica la plantilla de lanzamiento y la instancia de `dev` se reemplaza: unos minutos de corte (por confirmar). La lista de prefijos cuenta como una regla por entrada y la cuota por defecto del grupo puede quedarse justa: si el `apply` falla con `RulesPerSecurityGroupLimitExceeded`, hay que pedir un aumento en Service Quotas (por confirmar). Si tras el `apply` un `curl` directo al CNAME sigue dando `200`, se revierte (puerta de decisión de S17).
 
 ## Módulo storage
 
@@ -241,18 +241,34 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## app_env_vars
 
-Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Son **secretos**: los valores solo viven en `terraform.tfvars` (ignorado por git). La variable `app_env_vars` de `modules/beanstalk` lleva una `validation` que comprueba en `plan` que estén las nueve claves obligatorias de la tabla (solo los nombres, nunca los valores); las demás (`PORT` y `TRUST_PROXY_HOPS`) son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza.
+Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Esta tabla solo recoge las claves **no secretas**, cuyos valores viven en `terraform.tfvars` (ignorado por git). Los tres secretos que el backend también exige (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) ya no van aquí: están en [Secretos en Parameter Store](#secretos-en-parameter-store). La variable `app_env_vars` de `modules/beanstalk` lleva dos `validation`: la primera comprueba en `plan` que estén las seis claves obligatorias de la tabla (solo los nombres, nunca los valores) y la segunda falla si aparece alguno de los tres secretos; las demás (`PORT` y `TRUST_PROXY_HOPS`) son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza.
 
 | Clave | Obligatoria en el backend | Notas |
 |---|---|---|
 | `PORT` | No | Puerto del proceso; el proxy de Beanstalk reenvía el puerto 80 al 8000 |
 | `AWS_REGION` | Sí | Región del bucket; la del proveedor de Terraform |
 | `AWS_BUCKET_NAME` | Sí | Debe coincidir con `bucket_name` |
-| `JWT_SECRET` | Sí | Distinto en cada entorno |
 | `JWT_EXPIRATION` | Sí | Duración del token |
 | `ADMIN_USERNAME` | Sí | Usuario administrador |
-| `ADMIN_PASSWORD` | Sí | Hash bcrypt, nunca el texto en claro |
 | `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#resueltos)). Admite una lista separada por comas; en `prod`, `https://<dominio>,https://www.<dominio>` (ver [para-backend.md](integracion/para-backend.md#7-allowed_origin-por-entorno)) |
 | `EMAIL` | Sí | Cuenta de correo del backend |
-| `EMAIL_PASSWORD` | Sí | Contraseña de aplicación, no la de la cuenta |
 | `TRUST_PROXY_HOPS` | No | Saltos de proxy de confianza del backend: cadena entera de 1 a 5, sin espacios ni ceros a la izquierda (el 0 solo con `NODE_ENV` `local` o `test`); 1 si no se define. `dev` y `prod` llevan el mismo valor; el de `dev` está medido en nginx y deducido en Express, y el de `prod` está por confirmar (ver [para-backend.md](integracion/para-backend.md#6-plataforma-tamaño-de-instancia-y-correo-saliente)) |
+
+## Secretos en Parameter Store
+
+Los tres secretos que el backend exige al arrancar no son propiedades de entorno en claro ni claves de `app_env_vars`: viven en Parameter Store como `SecureString` y `modules/beanstalk` solo los **referencia** por ARN. El backend sigue leyendo las mismas variables de entorno, con los mismos nombres y las mismas reglas de `validateEnv.js`. **(verificado en código; efecto en AWS por confirmar hasta que el humano cree los parámetros y aplique)**
+
+| Variable | Obligatoria en el backend | Parámetro (por entorno) | Notas |
+|---|---|---|---|
+| `JWT_SECRET` | Sí | `/sigmetum/<env>/backend/JWT_SECRET` | `SecureString`; de al menos 32 caracteres; distinto en cada entorno |
+| `EMAIL_PASSWORD` | Sí | `/sigmetum/<env>/backend/EMAIL_PASSWORD` | `SecureString`; contraseña de aplicación, no la de la cuenta |
+| `ADMIN_PASSWORD` | Sí | `/sigmetum/<env>/backend/ADMIN_PASSWORD` | `SecureString`; hash bcrypt completo (60 caracteres, sin salto de línea final), nunca el texto en claro |
+
+`<env>` es `dev` o `prod` (`var.environment`). Los dos entornos usan el mismo mecanismo; solo cambia el nombre del parámetro.
+
+- **Quién crea los parámetros:** el humano, a mano y antes del `apply`, con el [procedimiento humano](integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano) (creación sin salto de línea final, verificación, orden de despliegue, rotación). Terraform no los crea y **no** usa `data "aws_ssm_parameter"` ni ningún recurso que lea o escriba el valor, así que el valor no entra en el estado ni en `terraform.tfvars`.
+- **Entrega:** un `dynamic "setting"` del espacio de nombres `aws:elasticbeanstalk:application:environmentsecrets` (uno por clave; el valor es el ARN del parámetro) en `aws_elastic_beanstalk_environment.this`. El ARN se construye en `local.ssm_secret_arns` con la partición, la región y la cuenta de los data sources `aws_partition`, `aws_region` y `aws_caller_identity`: `arn:<partición>:ssm:<región>:<cuenta>:parameter/sigmetum/<env>/backend/<CLAVE>` (una sola `/` tras `parameter`, la del nombre). El entorno declara `depends_on` de la política IAM.
+- **Permiso:** `aws_iam_role_policy.ssm_secrets` (`sigmetum-ssm-secrets-<env>`) añade al rol compartido `aws-elasticbeanstalk-ec2-role` (creado a mano, no por Terraform) una sentencia `Allow` con `ssm:GetParameters` y `ssm:GetParameter` sobre los tres ARN, sin comodines. No lleva `kms:Decrypt`: con la clave por defecto `aws/ssm` no hace falta **(por confirmar)**; una clave propia (CMK) sería otra decisión. Quien aplica necesita `iam:PutRolePolicy` sobre ese rol.
+- **Validation:** `app_env_vars` rechaza las tres claves en `plan`, con un mensaje que solo cita nombres; si alguien las deja en su `terraform.tfvars`, el `plan` falla.
+- **Plataforma (por confirmar):** el espacio de nombres `environmentsecrets` exige una versión mínima de plataforma no contrastada con la documentación oficial; el humano la comprueba en cada cuenta antes del `apply` (pre-condiciones del [plan](specs/2026-10-31-secretos-beanstalk-plan.md)).
+- **Si falta el parámetro, el permiso o este no se ha propagado:** el backend no arranca (falla cerrado).

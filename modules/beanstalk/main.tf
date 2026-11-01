@@ -2,6 +2,34 @@ locals {
   https_enabled = var.load_balancer_type == "application" && var.ssl_certificate_arn != ""
 
   restrict_origin = var.enable_cdn && var.load_balancer_type == "single"
+
+  # Secrets live in Parameter Store (SecureString), created by hand; Terraform never reads or writes their values.
+  # The name already starts with "/", so the ARN has a single "/" after "parameter".
+  ssm_secret_names = {
+    for key in ["JWT_SECRET", "EMAIL_PASSWORD", "ADMIN_PASSWORD"] : key => "/sigmetum/${var.environment}/backend/${key}"
+  }
+  ssm_secret_arns = {
+    for key, name in local.ssm_secret_names : key => "arn:${data.aws_partition.current.partition}:ssm:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:parameter${name}"
+  }
+}
+
+data "aws_partition" "current" {}
+data "aws_region" "current" {}
+data "aws_caller_identity" "current" {}
+
+# The instance role is created by hand (docs/aws-organizations-setup.md); Terraform only adds this inline policy.
+resource "aws_iam_role_policy" "ssm_secrets" {
+  name = "sigmetum-ssm-secrets-${var.environment}"
+  role = "aws-elasticbeanstalk-ec2-role"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["ssm:GetParameters", "ssm:GetParameter"]
+      Resource = values(local.ssm_secret_arns)
+    }]
+  })
 }
 
 resource "aws_elastic_beanstalk_application" "this" {
@@ -314,6 +342,18 @@ resource "aws_elastic_beanstalk_environment" "this" {
       value     = setting.value
     }
   }
+
+  # ── Secrets from Parameter Store (value is the parameter ARN, resolved on the instance) ──
+  dynamic "setting" {
+    for_each = local.ssm_secret_arns
+    content {
+      namespace = "aws:elasticbeanstalk:application:environmentsecrets"
+      name      = setting.key
+      value     = setting.value
+    }
+  }
+
+  depends_on = [aws_iam_role_policy.ssm_secrets]
 
   # Ignore platform patch updates (AWS bumps minor versions automatically)
   lifecycle {

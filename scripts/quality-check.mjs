@@ -363,6 +363,8 @@ const outputs = tfFiles
     const block = /^app_env_vars\s*=\s*\{([\s\S]*?)^\}/m.exec(existsSync(join(ROOT, file)) ? stripComments(read(file)) : '');
     return new Set([...(block?.[1].matchAll(/^\s+([A-Z][A-Z0-9_]*)\s*=/gm) ?? [])].map((m) => m[1]));
   };
+  // Claves que el backend exige pero llegan de Parameter Store, no de app_env_vars.
+  const SSM_SECRET_KEYS = ['JWT_SECRET', 'EMAIL_PASSWORD', 'ADMIN_PASSWORD'];
   const validate = join(BACKEND, 'config', 'validateEnv.js');
   if (!existsSync(validate)) notes.push('No existe ../sigmetum-backend/config/validateEnv.js: comprobación de app_env_vars omitida.');
   else {
@@ -370,7 +372,7 @@ const outputs = tfFiles
     if (required.length === 0) notes.push('No se pudo leer la lista required de validateEnv.js.');
     for (const env of environments) {
       const keys = exampleKeys(env);
-      required.filter((key) => !keys.has(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example no define ${key}, que el backend exige al arrancar`));
+      required.filter((key) => !keys.has(key) && !SSM_SECRET_KEYS.includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example no define ${key}, que el backend exige al arrancar`));
       [...keys].filter((key) => !required.includes(key) && !['PORT', 'TRUST_PROXY_HOPS'].includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example define ${key}, que el backend no exige (¿sobra?)`));
     }
   }

@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios). El backend no tiene un documento `para-infra.md` equivalente: su contrato con esta infraestructura es `config/validateEnv.js`, `config/trustProxy.js`, `app.js` y `aws/awsS3connect.js`, que se citan aquí.
 
 - Lo verificado contra el código de Terraform y del backend está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 30/09/2026 (actualizado 31/10/2026, `TRUST_PROXY_HOPS`, restricción del origen de `dev` a CloudFront y `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `276ab48` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
+- Fecha de la verificación: 30/09/2026 (actualizado 31/10/2026, secretos en Parameter Store, `TRUST_PROXY_HOPS`, restricción del origen de `dev` a CloudFront y `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `cee5e23` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
 
 ## 1. Resumen
 
@@ -20,16 +20,16 @@ Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [m
 
 El backend exige estas variables al arrancar (`config/validateEnv.js`, verificado). Solo se listan **nombres**, nunca valores. Además de existir, algunas tienen reglas de valor (validación estricta):
 
-Desde la limpieza de deuda M7 (31/10/2026), la variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las nueve obligatorias de la tabla (sin revelar valores) y acepta claves extra; no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. El contrato no cambia.
+Desde la limpieza de deuda M7 (31/10/2026), la variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las obligatorias de la tabla (sin revelar valores) y acepta claves extra; no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. Desde la migración de secretos (31/10/2026) la lista que exige son las seis no secretas, y una segunda `validation` **rechaza** `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` en `app_env_vars`. **El contrato de nombres no cambia:** el backend sigue recibiendo las nueve variables con los mismos nombres y las mismas reglas de valor; solo cambia cómo llegan las tres secretas.
 
 | Variable | Exigida por el backend | La define `app_env_vars` hoy | Es secreto |
 |---|---|---|---|
-| `JWT_SECRET` | Sí | Sí | Sí |
+| `JWT_SECRET` | Sí | No: llega de Parameter Store | Sí |
 | `JWT_EXPIRATION` | Sí | Sí | No |
 | `ADMIN_USERNAME` | Sí | Sí | No |
-| `ADMIN_PASSWORD` | Sí | Sí | Sí (hash bcrypt) |
+| `ADMIN_PASSWORD` | Sí | No: llega de Parameter Store | Sí (hash bcrypt) |
 | `EMAIL` | Sí | Sí | No |
-| `EMAIL_PASSWORD` | Sí | Sí | Sí |
+| `EMAIL_PASSWORD` | Sí | No: llega de Parameter Store | Sí |
 | `AWS_REGION` | Sí | Sí (`eu-west-3`) | No |
 | `AWS_BUCKET_NAME` | Sí | Sí (`sigmetum-app-assets-dev` / `sigmetum-app-assets-prod`) | No |
 | `ALLOWED_ORIGIN` | Sí | Sí (vacío en dev hasta conocer la URL de Amplify) | No |
@@ -49,7 +49,88 @@ Desde la limpieza de deuda M7 (31/10/2026), la variable `app_env_vars` de `modul
 
 Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las claves obligatorias. Los `terraform.tfvars` reales (fuera de git) deben tenerlas aplicadas por quien despliega.
 
-**Cómo llegan hoy:** como propiedades de entorno del entorno de Beanstalk (`dynamic "setting"` sobre `app_env_vars`, namespace `aws:elasticbeanstalk:application:environment`, verificado en `modules/beanstalk/main.tf`). Son legibles en la consola por quien pueda ver la configuración del entorno (hallazgo de seguridad [S6](../estado-y-deuda-tecnica.md#abiertos)).
+**Cómo llegan hoy:**
+
+- **Las claves no secretas** (`app_env_vars`): como propiedades de entorno del entorno de Beanstalk (`dynamic "setting"` sobre `app_env_vars`, namespace `aws:elasticbeanstalk:application:environment`, verificado en `modules/beanstalk/main.tf`).
+- **Los tres secretos** (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`): desde Parameter Store (`SecureString`, parámetro `/sigmetum/<env>/backend/<CLAVE>`), con un `dynamic "setting"` del espacio de nombres `aws:elasticbeanstalk:application:environmentsecrets` cuyo valor es el ARN del parámetro; la plataforma resuelve el valor en la instancia y el proceso lo ve como variable de entorno con el mismo nombre **(verificado en código; efecto en AWS por confirmar hasta el `apply`; la versión mínima de plataforma, por confirmar)**. Dejan de ser propiedades de entorno en claro (resuelve en código [S6](../estado-y-deuda-tecnica.md#abiertos)). Terraform no crea los parámetros ni lee su valor: los crea el humano antes del `apply`.
+- **Efecto operativo:** el `apply` reconfigura el entorno y puede reiniciar la aplicación (en `prod`, con despliegue gradual). Si falta un parámetro, falta el permiso o este no se ha propagado, **el backend no arranca** (falla cerrado). Backend: sin cambios de código.
+
+### Secretos en Parameter Store: procedimiento humano
+
+**(por confirmar)** hasta que se ejecute. Solo nombres y marcadores; **nunca** un valor en un documento, en el historial del terminal ni en `--value` por línea de comandos. `<env>` es `dev` o `prod`; `<CLAVE>` es `JWT_SECRET`, `EMAIL_PASSWORD` o `ADMIN_PASSWORD`; `<perfil>` es el perfil de la cuenta del entorno. Descripción de la política y de las claves: [referencia](../referencia-modulos.md#secretos-en-parameter-store).
+
+**Pre-condiciones del `apply` (por entorno y por cuenta).** Si una falla, no se aplica y se vuelve a requisitos (el backend no se toca):
+
+1. **Plataforma que soporta `environmentsecrets` (por confirmar).** La plataforma desplegada puede diferir de `var.solution_stack_name` (`ignore_changes`). Solo lectura: `aws elasticbeanstalk describe-environments --environment-names sigmetum-backend-<env>-env --query "Environments[0].PlatformArn"` y `aws elasticbeanstalk describe-configuration-options --environment-name sigmetum-backend-<env>-env --query "Options[?Namespace=='aws:elasticbeanstalk:application:environmentsecrets']"`; si esta última no devuelve nada, el entorno no lo soporta.
+2. **Los tres parámetros creados y verificados** con los pasos de abajo.
+3. **Quien aplica tiene `iam:PutRolePolicy`** sobre `aws-elasticbeanstalk-ec2-role` en esa cuenta.
+4. **Riesgo aceptado:** `dev` y `prod` se aplican en la misma sesión, sin puerta intermedia: un fallo que `dev` habría destapado se descubre con `prod` ya aplicándose.
+
+**Crear cada parámetro sin salto de línea final.** Un `file://` con `\n` final guarda un salto de línea en el valor y `validateEnv.js` lo rechaza (un bcrypt lleva `$`, que además no debe expandirse).
+
+- **PowerShell** (la entrada de `Read-Host` no va al historial ni expande `$`; el `finally` borra el temporal y las variables aunque `aws` falle o se cancele con Ctrl+C):
+  ```powershell
+  $f = Join-Path $env:TEMP "p.tmp"
+  try {
+    $s = Read-Host -AsSecureString "valor"
+    $v = [System.Net.NetworkCredential]::new('', $s).Password
+    [IO.File]::WriteAllText($f, $v)
+    (Get-Item $f).Length
+    Read-Host "Longitud correcta (60 para un bcrypt)? Intro para subir, Ctrl+C para cancelar"
+    aws ssm put-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --type SecureString --value "file://$f" --overwrite --profile <perfil>
+  } finally {
+    Remove-Item $f -ErrorAction SilentlyContinue
+    Remove-Variable v,s -ErrorAction SilentlyContinue
+  }
+  ```
+- **Bash** (`printf '%s'` no añade salto; `IFS= read -r` no expande `$` ni recorta espacios; el subshell hace que el `trap` se ejecute al terminar el bloque, también si `aws` falla):
+  ```bash
+  (
+    f=$(mktemp); trap 'rm -f "$f"; unset v' EXIT
+    IFS= read -rs v; printf '%s' "$v" > "$f"
+    wc -c < "$f"
+    read -rp "Longitud correcta (60 para un bcrypt)? Intro para subir, Ctrl+C para cancelar " _
+    aws ssm put-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --type SecureString --value "file://$f" --overwrite --profile <perfil>
+  )
+  ```
+- **Git Bash en Windows:** `mktemp` devuelve una ruta `/tmp/...` que `aws.exe` (programa de Windows) puede no resolver con `file://`. Usa `--value "file://$(cygpath -m "$f")"` (ruta con forma `C:/...`) o el procedimiento de PowerShell.
+- **Medir el archivo antes de subirlo** (los comandos de arriba ya lo hacen): `(Get-Item $f).Length` en PowerShell y `wc -c < "$f"` en Bash. Un bcrypt debe dar **60**; **61** indica salto de línea final (se repite sin subir). Para `JWT_SECRET` y `EMAIL_PASSWORD` solo se comprueba que no hay un byte de más respecto a lo que se tecleó. Archivo temporal fuera del repositorio y borrado después (no hay borrado seguro garantizado, por confirmar).
+
+**Verificar:**
+
+1. **Que existen:** `aws ssm describe-parameters --parameter-filters "Key=Name,Option=BeginsWith,Values=/sigmetum/<env>/backend/" --profile <perfil>`, sin leer el valor. El campo `Name` empieza por `/`.
+2. **El valor sin imprimirlo (por confirmar; exige `ssm:GetParameter` con descifrado al operador):** leerlo a una variable y mostrar solo longitud y prefijo (60 y `$2` para el bcrypt; al menos 32 para `JWT_SECRET`). Sin `echo` del valor.
+   - **PowerShell** (si `$v` no es un `string` sino una lista, el valor guardado lleva salto de línea):
+     ```powershell
+     $v = aws ssm get-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --with-decryption --query "Parameter.Value" --output text --profile <perfil>
+     $v -is [string]; $v.Length; $v.Substring(0,2)
+     Remove-Variable v
+     ```
+   - **Bash** (la salida `text` añade un salto, así que un bcrypt correcto da 61 en el `wc` y 60 en `${#v}`; `$(...)` recorta los saltos finales, por eso el `wc` es el que delata uno guardado de más):
+     ```bash
+     aws ssm get-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --with-decryption --query "Parameter.Value" --output text --profile <perfil> | wc -c
+     v=$(aws ssm get-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --with-decryption --query "Parameter.Value" --output text --profile <perfil>); printf '%s %s\n' "${#v}" "${v:0:2}"; unset v
+     ```
+
+**Orden de despliegue:**
+
+1. Crear los tres parámetros en cada cuenta (`dev` y `prod`) y verificarlos.
+2. Comprobar las pre-condiciones.
+3. Quitar `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` de `app_env_vars` en `terraform.tfvars` de cada entorno (si siguen, `plan` falla por la `validation`).
+4. `terraform plan` (el humano lo revisa sin pegar su salida) y `apply` en `dev` y `prod` en la misma sesión.
+5. Sin cambios en backend ni en frontend.
+
+**Tras el `apply` (por confirmar):** salud `Ok` y arranque sin error de `validateEnv.js` (exige el bcrypt completo, sin `$` expandido); login real del administrador; con acceso a la instancia (SSH deshabilitado por defecto), `get-config environment -k ADMIN_PASSWORD` comprobando solo la longitud. Y que la configuración del entorno (`describe-configuration-settings`, solo nombres) ya no lista las tres claves en `aws:elasticbeanstalk:application:environment`.
+
+**Si el entorno no se recupera tras el `apply`** (política aún no visible por la propagación de IAM, parámetro ausente o inválido):
+
+1. Solo lectura: `aws elasticbeanstalk describe-events --environment-name sigmetum-backend-<env>-env --max-items 20` y `describe-environments` (`Status`, `Health`).
+2. Esperar a `Ready`: Beanstalk revierte una actualización de configuración fallida. No se aborta a mano (`abort-environment-update` cambia recursos y exige confirmación expresa).
+3. Repetir `terraform apply` en ese entorno; la política ya existe y solo se reintenta el update. Si el entorno queda `Degraded` o `Severe`, consultar antes de actuar; si la causa es un parámetro ausente o inválido, se corrige y se repite el `apply`.
+
+**Rotar un secreto** (paso aparte, posterior; los valores actuales se migran tal cual): sobrescribir el parámetro con el mismo método de arriba (`--overwrite`), reiniciar o redesplegar el entorno para que se relea (**por confirmar** si basta el reinicio) y comprobar el health check. Mientras no se rote, los valores antiguos siguen en versiones previas del estado de Terraform (bucket versionado) y en el `terraform.tfvars` local de quien desplegó.
+
+**Vuelta atrás:** revertir exige revertir el commit completo (la `validation` nueva rechaza las tres claves, así que reponerlas como propiedades de entorno obliga a restaurar también `variables.tf` y a volver a poner los valores en `terraform.tfvars`). La política IAM y los parámetros no se borran solos; el humano los elimina aparte, con confirmación expresa.
 
 ## 3. Health check
 
@@ -84,6 +165,8 @@ La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role`
 |---|---|---|---|
 | `ObjectsInGalleryAndData` | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `gallery/*` y `data/*` del bucket del entorno | — |
 | `ListGalleryAndData` | `s3:ListBucket` | El bucket | `StringLike` en `s3:prefix`: `gallery/*` o `data/*` |
+
+Además, `modules/beanstalk` añade al mismo rol la política en línea `sigmetum-ssm-secrets-<env>`, con `ssm:GetParameters` y `ssm:GetParameter` solo sobre los tres parámetros de secretos del entorno (`/sigmetum/<env>/backend/<CLAVE>`), sin comodines y sin acceso a S3 (sección 2; **verificado en código, efecto aplicado por confirmar**). No cambia lo que el backend puede hacer en S3.
 
 **Prefijos efectivos que debe respetar el backend:** `gallery/` y `data/` (esto cubre `data/active/`, `data/terms/`, `data/drafts/` y `data/<provincia>/`; `config/s3Paths.js`, verificado). **Sin acceso** para el rol a `assets/`, a la raíz del bucket ni a ningún otro prefijo: esos accesos darán acceso denegado. `assets/*` queda solo para CloudFront.
 
@@ -226,6 +309,7 @@ El bucket de staging lo deriva el workflow del account ID al correr (`elasticbea
 | Si cambias... | Actualiza en este documento | Avisa |
 |---|---|---|
 | Una clave de `app_env_vars` | Sección 2 | PR: qué clave, en qué entorno (solo nombres) |
+| Uno de los tres secretos (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) o su política IAM de lectura | Sección 2 (procedimiento de Parameter Store) y [referencia](../referencia-modulos.md#secretos-en-parameter-store) | PR: qué parámetro y en qué entorno (solo nombres); quién debe crearlo o rotarlo y en qué orden |
 | `HealthCheckPath` u otro ajuste de Beanstalk | Sección 3 | PR |
 | El ALB, el certificado o el DNS | Sección 4 | PR: nuevo dominio o URL |
 | La política IAM de `modules/storage` | Sección 5 (y B2 de la sección 8) | PR: qué acciones o prefijos cambian |

@@ -81,15 +81,22 @@ variable "notification_email" {
 }
 
 variable "app_env_vars" {
-  description = "Application environment variables passed to the Node.js process. Must define every key the backend requires at startup; extra keys are allowed."
+  description = "Non-secret application environment variables passed to the Node.js process. Must define every non-secret key the backend requires at startup; extra keys are allowed. JWT_SECRET, EMAIL_PASSWORD and ADMIN_PASSWORD live in Parameter Store and must not be set here."
   type        = map(string)
   sensitive   = true
   default     = {}
 
   validation {
     condition = alltrue([
-      for key in ["JWT_SECRET", "JWT_EXPIRATION", "ADMIN_USERNAME", "ADMIN_PASSWORD", "EMAIL", "EMAIL_PASSWORD", "AWS_REGION", "AWS_BUCKET_NAME", "ALLOWED_ORIGIN"] : contains(keys(var.app_env_vars), key)
+      for key in ["JWT_EXPIRATION", "ADMIN_USERNAME", "EMAIL", "AWS_REGION", "AWS_BUCKET_NAME", "ALLOWED_ORIGIN"] : contains(keys(var.app_env_vars), key)
     ])
-    error_message = "app_env_vars must define the keys the backend requires at startup: JWT_SECRET, JWT_EXPIRATION, ADMIN_USERNAME, ADMIN_PASSWORD, EMAIL, EMAIL_PASSWORD, AWS_REGION, AWS_BUCKET_NAME and ALLOWED_ORIGIN."
+    error_message = "app_env_vars must define the keys the backend requires at startup: JWT_EXPIRATION, ADMIN_USERNAME, EMAIL, AWS_REGION, AWS_BUCKET_NAME and ALLOWED_ORIGIN."
+  }
+
+  validation {
+    condition = !anytrue([
+      for key in ["JWT_SECRET", "EMAIL_PASSWORD", "ADMIN_PASSWORD"] : contains(keys(var.app_env_vars), key)
+    ])
+    error_message = "app_env_vars must not define JWT_SECRET, EMAIL_PASSWORD or ADMIN_PASSWORD: they are delivered from Parameter Store (see the secrets procedure in the security guide and docs/integracion/para-backend.md)."
   }
 }

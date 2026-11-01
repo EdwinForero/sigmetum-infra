@@ -38,6 +38,8 @@ modules/
 
 Dev y prod difieren a propósito en cómo se protege el origen del backend: dev no tiene ALB, así que el módulo crea un grupo de seguridad que solo admite HTTP desde CloudFront (y una llamada directa al CNAME de Beanstalk deja de funcionar); prod está detrás de un ALB cuyo grupo de seguridad gestiona Beanstalk, así que ahí no se añade nada (si el ALB necesita este cambio está por confirmar). Ver [S17](docs/estado-y-deuda-tecnica.md#abiertos) y [docs/referencia-modulos.md](docs/referencia-modulos.md#restricción-del-origen-a-cloudfront-solo-dev).
 
+Los secretos del backend (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) llegan a Beanstalk desde Parameter Store (`SecureString`) en los dos entornos con el mismo mecanismo; solo difiere el nombre del parámetro (`/sigmetum/dev/backend/<CLAVE>` y `/sigmetum/prod/backend/<CLAVE>`), así que no hay divergencia. Los crea el humano a mano antes del `apply`: [procedimiento](docs/integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano) y [referencia](docs/referencia-modulos.md#secretos-en-parameter-store).
+
 Cada entorno tiene su propio bucket de logs de acceso de S3 (`sigmetum-access-logs-<entorno>`, creado en `modules/storage`), que recibe los registros de acceso del bucket de datos (prefijo `app-data/`) y del bucket de staging de Beanstalk (prefijo `beanstalk-staging/`; Terraform solo gestiona su ajuste de logs). Los registros caducan a los noventa días; el bucket tiene `prevent_destroy` y no se registra a sí mismo ([M15](docs/estado-y-deuda-tecnica.md#abiertos)). Dev y prod tienen la misma estructura; solo cambia el nombre, así que no hay divergencia.
 
 Diagramas: [dev](docs/diagramas/arquitectura-dev.html) · [prod](docs/diagramas/arquitectura-prod.html)
@@ -79,7 +81,7 @@ cd environments/dev
 set AWS_PROFILE=sigmetum-preprod
 ```
 
-Copia `terraform.tfvars.example` a `terraform.tfvars` y rellénalo (no subas nunca este archivo a git). Las variables y las claves de `app_env_vars` están descritas en [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev). `terraform plan` falla con «Invalid value for variable» si a `app_env_vars` le falta alguna de las nueve claves que el backend exige al arrancar (solo se comprueban los nombres, nunca los valores). `TRUST_PROXY_HOPS` es una clave opcional de `app_env_vars`: su valor en dev (dos) se midió en nginx y se dedujo para Express, y aplicarla reconfigura el entorno de Beanstalk y puede reiniciar la aplicación.
+Copia `terraform.tfvars.example` a `terraform.tfvars` y rellénalo (no subas nunca este archivo a git). Las variables y las claves de `app_env_vars` están descritas en [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-dev). `terraform plan` falla con «Invalid value for variable» si a `app_env_vars` le falta alguna de las seis claves no secretas que el backend exige al arrancar, o si define `JWT_SECRET`, `EMAIL_PASSWORD` o `ADMIN_PASSWORD`, que viven en Parameter Store y se crean antes del `apply` ([procedimiento](docs/integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano)); solo se comprueban los nombres, nunca los valores. `TRUST_PROXY_HOPS` es una clave opcional de `app_env_vars`: su valor en dev (dos) se midió en nginx y se dedujo para Express, y aplicarla reconfigura el entorno de Beanstalk y puede reiniciar la aplicación.
 
 ```powershell
 terraform init
@@ -103,7 +105,7 @@ cd environments/prod
 set AWS_PROFILE=sigmetum-prod
 ```
 
-Copia `terraform.tfvars.example` a `terraform.tfvars` y rellénalo (no subas nunca este archivo a git). Las variables y las claves de `app_env_vars` están descritas en [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod). `terraform plan` falla con «Invalid value for variable» si a `app_env_vars` le falta alguna de las nueve claves que el backend exige al arrancar (solo se comprueban los nombres, nunca los valores). `TRUST_PROXY_HOPS` es una clave opcional de `app_env_vars` y su valor en prod está por confirmar: mídelo con el procedimiento de [docs/integracion/para-backend.md](docs/integracion/para-backend.md#medir-los-saltos-de-proxy-trust_proxy_hops) antes del primer `apply` de prod.
+Copia `terraform.tfvars.example` a `terraform.tfvars` y rellénalo (no subas nunca este archivo a git). Las variables y las claves de `app_env_vars` están descritas en [docs/referencia-modulos.md](docs/referencia-modulos.md#entorno-prod). `terraform plan` falla con «Invalid value for variable» si a `app_env_vars` le falta alguna de las seis claves no secretas que el backend exige al arrancar, o si define `JWT_SECRET`, `EMAIL_PASSWORD` o `ADMIN_PASSWORD`, que viven en Parameter Store y se crean antes del `apply` ([procedimiento](docs/integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano)); solo se comprueban los nombres, nunca los valores. `TRUST_PROXY_HOPS` es una clave opcional de `app_env_vars` y su valor en prod está por confirmar: mídelo con el procedimiento de [docs/integracion/para-backend.md](docs/integracion/para-backend.md#medir-los-saltos-de-proxy-trust_proxy_hops) antes del primer `apply` de prod.
 
 ```powershell
 terraform init
@@ -148,6 +150,7 @@ Todos los recursos llevan las etiquetas `Project`, `Environment`, `ManagedBy` y 
 
 - Los archivos `terraform.tfvars` están en `.gitignore`: no los subas nunca a git.
 - Rota periódicamente el token de acceso de GitHub y actualiza los `tfvars`.
+- `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` no van en `terraform.tfvars`: viven en Parameter Store ([procedimiento](docs/integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano)).
 - `JWT_SECRET` debe ser distinto en dev y en prod.
 - Usa contraseñas de aplicación de Gmail (no la contraseña de tu cuenta) para `EMAIL_PASSWORD`.
 
@@ -182,6 +185,7 @@ Cada entorno expone sus propios outputs; están listados en [docs/referencia-mod
 | [Aviso de PR](docs/specs/2026-10-31-limpieza-deuda-d-aviso-pr.md) | Limpieza de deuda (31/10/2026): `moved` de la política del bucket de datos, descripción de `load_balancers`, `TRUST_PROXY_HOPS` en `quality-check`, README en español (M12, M13, B2); sin cambios de recursos |
 | [Spec](docs/specs/2026-10-31-m2-node-env-react-design.md), [plan](docs/specs/2026-10-31-m2-node-env-react-plan.md) y [aviso de PR](docs/specs/2026-10-31-m2-node-env-react-aviso-pr.md) | M2 reabierto: `NODE_ENV` fuera de Amplify; React en modo producción |
 | [Spec](docs/specs/2026-10-31-observabilidad-acceso-design.md), [plan](docs/specs/2026-10-31-observabilidad-acceso-plan.md) y [aviso de PR](docs/specs/2026-10-31-observabilidad-acceso-aviso-pr.md) | Registros de acceso de S3 (31/10/2026): bucket de logs de acceso por entorno, registros en el bucket de datos y en el de staging de Beanstalk, retención de noventa días (S5 y M11 resueltos en código; M15 nuevo) |
+| [Spec](docs/specs/2026-10-31-secretos-beanstalk-design.md), [plan](docs/specs/2026-10-31-secretos-beanstalk-plan.md) y [aviso de PR](docs/specs/2026-10-31-secretos-beanstalk-aviso-pr.md) | Secretos de Beanstalk en Parameter Store (31/10/2026): `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` salen de `app_env_vars` y llegan como `SecureString`; política IAM de lectura acotada (S6 resuelto en código, S2 parcial) |
 | [Spec](docs/specs/2026-10-31-estado-remoto-design.md), [plan](docs/specs/2026-10-31-estado-remoto-plan.md) y [aviso de PR](docs/specs/2026-10-31-estado-remoto-aviso-pr.md) | Estado remoto, versiones y archivo de bloqueo (31/10/2026): `encrypt` y bloqueo nativo de S3 en los dos backends, Terraform >= 1.11, CI en 1.15.5, archivos de bloqueo versionados (S3 y M5 resueltos en código; S4 parcial) |
 
 ## CI y GitHub
