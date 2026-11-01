@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios). El backend no tiene un documento `para-infra.md` equivalente: su contrato con esta infraestructura es `config/validateEnv.js`, `config/trustProxy.js`, `app.js` y `aws/awsS3connect.js`, que se citan aquí.
 
 - Lo verificado contra el código de Terraform y del backend está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 30/09/2026 (actualizado 31/10/2026, secretos en Parameter Store, `TRUST_PROXY_HOPS`, restricción del origen de `dev` a CloudFront y `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `cee5e23` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
+- Fecha de la verificación: 30/09/2026 (actualizado 31/10/2026, login con Cognito y `COGNITO_USER_POOL_ID`, secretos de vuelta a `app_env_vars` (Parameter Store revertido), `TRUST_PROXY_HOPS`, restricción del origen de `dev` a CloudFront y `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `cee5e23` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
 
 ## 1. Resumen
 
@@ -15,28 +15,31 @@ Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [m
 | **backend:I7** | Sin `TRUST_PROXY_HOPS` el backend usa 1 salto por defecto, que es incorrecto en `dev` | Si los saltos reales difieren, el limitador de intentos agrupa mal las IP (en `dev`, todos los visitantes de un extremo de CloudFront comparten cupo) o se esquiva con `X-Forwarded-For` | **Resuelto en el repositorio para `dev` (medido: dos). Pendiente: `apply` del humano y medición en `prod`.** Sigue abierto (prioridad alta) con riesgo residual por `infra:S17` y debe cerrarse **antes de que el backend despliegue la entrega 2 de M21** (`POST /send-email` pública; condición del backend en su `para-infra.md`, sección 6) (no es `frontend:I7`) |
 | **infra:S17** | El origen de Beanstalk de `dev` admitía HTTP directo desde cualquier origen (verificado el 31/10/2026 con `curl` y `describe-security-groups`) | Una petición directa al CNAME de Beanstalk salta CloudFront: con el valor dos, `X-Forwarded-For` es falsificable y los límites de login y `/send-email` se esquivan | **Resuelto en código para `dev`, pendiente del `apply` y de la puerta de decisión** (si `curl` directo sigue dando `200`, se revierte y se anota la deuda). Detalle en la sección 4 |
 | **infra:S15** (dependencia del `apply`) | El backend ya trata `AccessDenied` como "no existe" en lecturas (`GET /list-terms`, `GET /get-data/:path(*)`), pero no en las rutas que escriben (`upload-term`, `delete-term`), a propósito | Tras acotar `s3:ListBucket` por `Prefix` (infra:S7), una clave inexistente da `AccessDenied` y no `NoSuchKey` **(por confirmar el estado exacto)**. En `dev`, `data/terms/noLatinTerms.json` no existe (verificado el 31/10/2026): `/list-terms` da `200` con lista vacía, pero la primera alta de término fallaría con 500 | **Abierto, para quien despliega**: subir `data/terms/noLatinTerms.json` con `[]` a dev y prod (comando en la sección 5); el backend no cambia |
+| **infra:C16** | El backend no valida `client_id` ni grupos de los tokens de Cognito | Cualquier usuario del pool es administrador | **Aceptado por el usuario**, válido solo con registro cerrado y un pool de solo administradores; vía de salida en la sección 2 |
+| **infra:S6** | `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` vuelven a ser propiedades de entorno de Beanstalk | Pueden verse en la salida de `terraform plan` y en el estado | **Reabierto**; detalle en la sección 2 |
 
 ## 2. Contrato de entorno: `app_env_vars` frente a `validateEnv.js`
 
 El backend exige estas variables al arrancar (`config/validateEnv.js`, verificado). Solo se listan **nombres**, nunca valores. Además de existir, algunas tienen reglas de valor (validación estricta):
 
-Desde la limpieza de deuda M7 (31/10/2026), la variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las obligatorias de la tabla (sin revelar valores) y acepta claves extra; no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. Desde la migración de secretos (31/10/2026) la lista que exige son las seis no secretas, y una segunda `validation` **rechaza** `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` en `app_env_vars`. **El contrato de nombres no cambia:** el backend sigue recibiendo las nueve variables con los mismos nombres y las mismas reglas de valor; solo cambia cómo llegan las tres secretas.
+La variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las nueve variables del backend de la tabla más `COGNITO_USER_POOL_ID` (que inyecta el entorno, no el humano), acepta claves extra y no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. **Los tres secretos vuelven a `app_env_vars`** (se revierte la migración a Parameter Store del commit `0885804`, ver el aviso de la sección siguiente).
 
 | Variable | Exigida por el backend | La define `app_env_vars` hoy | Es secreto |
 |---|---|---|---|
-| `JWT_SECRET` | Sí | No: llega de Parameter Store | Sí |
+| `JWT_SECRET` | Sí | Sí (`terraform.tfvars`) | Sí |
 | `JWT_EXPIRATION` | Sí | Sí | No |
 | `ADMIN_USERNAME` | Sí | Sí | No |
-| `ADMIN_PASSWORD` | Sí | No: llega de Parameter Store | Sí (hash bcrypt) |
+| `ADMIN_PASSWORD` | Sí | Sí (`terraform.tfvars`) | Sí (hash bcrypt) |
 | `EMAIL` | Sí | Sí | No |
-| `EMAIL_PASSWORD` | Sí | No: llega de Parameter Store | Sí |
+| `EMAIL_PASSWORD` | Sí | Sí (`terraform.tfvars`) | Sí |
 | `AWS_REGION` | Sí | Sí (`eu-west-3`) | No |
 | `AWS_BUCKET_NAME` | Sí | Sí (`sigmetum-app-assets-dev` / `sigmetum-app-assets-prod`) | No |
 | `ALLOWED_ORIGIN` | Sí | Sí (vacío en dev hasta conocer la URL de Amplify) | No |
 | `AWS_PROFILE` | Solo si `NODE_ENV=local` | No aplica (Beanstalk no usa `NODE_ENV=local`) | No |
 | `TRUST_PROXY_HOPS` | No (opcional; 1 si no se define) | Sí (`"2"` en los `.example`; el de `prod` por confirmar, `backend:I7`) | No |
+| `COGNITO_USER_POOL_ID` | **No, todavía** (el backend la exigirá cuando valide tokens de Cognito; tarea del backend) | La inyecta Terraform desde el módulo `cognito` en `main.tf` de cada entorno; **no** va en `terraform.tfvars` | No |
 
-**Efecto operativo de añadir `TRUST_PROXY_HOPS`:** cambia las propiedades de entorno de Beanstalk (un setting nuevo en `aws:elasticbeanstalk:application:environment`), lo que reconfigura el entorno y puede reiniciar la aplicación. El `apply` lo ejecuta el humano. El backend ya soporta la variable (M12), así que no hay despliegue previo en backend ni en frontend. Si el humano copia el `.example` de `prod` sin medir, fija un valor no verificado: mídelo antes (sección 6).
+**Efecto operativo de las claves nuevas o devueltas:** cambian las propiedades de entorno de Beanstalk (settings de `aws:elasticbeanstalk:application:environment`), lo que reconfigura el entorno y **reinicia el backend** (en `prod`, con despliegue gradual **(por confirmar)**). El `apply` lo ejecuta el humano.
 
 **Reglas de valor (verificado en `config/validateEnv.js` y `config/trustProxy.js`; solo reglas, sin valores):**
 
@@ -47,90 +50,56 @@ Desde la limpieza de deuda M7 (31/10/2026), la variable `app_env_vars` de `modul
 - Con `NODE_ENV` distinto de `local` y `test`, un valor inválido **impide el arranque**; con `local` o `test` solo avisa. **No definir `NODE_ENV` como `local` ni `test` en Beanstalk** (estaría relajando la validación).
 - Si los valores reales de `terraform.tfvars` cumplen estas reglas: **(por confirmar)**; no se leen. Un valor incumplidor haría que el backend no arranque tras el despliegue.
 
-Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las claves obligatorias. Los `terraform.tfvars` reales (fuera de git) deben tenerlas aplicadas por quien despliega.
+Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las claves que pone el humano (no `COGNITO_USER_POOL_ID`). Los `terraform.tfvars` reales (fuera de git) deben tenerlas aplicadas por quien despliega; si el humano ya había quitado las tres claves de secretos de su `terraform.tfvars` (migración revertida), `plan` falla por la `validation` y hay que reponerlas (falla cerrado, es lo esperado).
 
-**Cómo llegan hoy:**
+**Cómo llegan:** todas como propiedades de entorno del entorno de Beanstalk (`dynamic "setting"` sobre `app_env_vars`, namespace `aws:elasticbeanstalk:application:environment`, verificado en `modules/beanstalk/main.tf`). No hay Parameter Store, `environmentsecrets` ni política IAM `sigmetum-ssm-secrets-<env>` en el código.
 
-- **Las claves no secretas** (`app_env_vars`): como propiedades de entorno del entorno de Beanstalk (`dynamic "setting"` sobre `app_env_vars`, namespace `aws:elasticbeanstalk:application:environment`, verificado en `modules/beanstalk/main.tf`).
-- **Los tres secretos** (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`): desde Parameter Store (`SecureString`, parámetro `/sigmetum/<env>/backend/<CLAVE>`), con un `dynamic "setting"` del espacio de nombres `aws:elasticbeanstalk:application:environmentsecrets` cuyo valor es el ARN del parámetro; la plataforma resuelve el valor en la instancia y el proceso lo ve como variable de entorno con el mismo nombre **(verificado en código; efecto en AWS por confirmar hasta el `apply`; la versión mínima de plataforma, por confirmar)**. Dejan de ser propiedades de entorno en claro (resuelve en código [S6](../estado-y-deuda-tecnica.md#abiertos)). Terraform no crea los parámetros ni lee su valor: los crea el humano antes del `apply`.
-- **Efecto operativo:** el `apply` reconfigura el entorno y puede reiniciar la aplicación (en `prod`, con despliegue gradual). Si falta un parámetro, falta el permiso o este no se ha propagado, **el backend no arranca** (falla cerrado). Backend: sin cambios de código.
+**Aviso: S6 reabierto.** Al revertir `0885804`, `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` **vuelven a viajar como propiedades de entorno de Beanstalk**. `for_each = nonsensitive(var.app_env_vars)` (`modules/beanstalk/main.tf`) quita la marca de sensible: **pueden verse en la salida de `terraform plan` y en el estado**. No se asume que el proveedor oculte `setting.value`. Mitigaciones existentes: estado cifrado (`aa4b508`) y la regla de no pegar la salida del `plan` (ni en chats ni en PR). Seguimiento: [S6 y S2](../estado-y-deuda-tecnica.md#abiertos).
 
-### Secretos en Parameter Store: procedimiento humano
+### Login con Cognito: contrato del backend
 
-**(por confirmar)** hasta que se ejecute. Solo nombres y marcadores; **nunca** un valor en un documento, en el historial del terminal ni en `--value` por línea de comandos. `<env>` es `dev` o `prod`; `<CLAVE>` es `JWT_SECRET`, `EMAIL_PASSWORD` o `ADMIN_PASSWORD`; `<perfil>` es el perfil de la cuenta del entorno. Descripción de la política y de las claves: [referencia](../referencia-modulos.md#secretos-en-parameter-store).
+Infra crea un pool de usuarios de Cognito por entorno (módulo `cognito`, [referencia](../referencia-modulos.md#módulo-cognito)) y entrega al backend **solo** `COGNITO_USER_POOL_ID`; la región va en el prefijo del id y `AWS_REGION` ya existe. **(verificado en código; efecto en AWS por confirmar hasta el `apply`.)** Hoy `middleware/tokenAuthentication.js` solo acepta HS256 con `JWT_SECRET` y no usa ninguna librería de JWKS **(verificado el 31/10/2026 en la spec)**. Lo que debe hacer el backend al verificar un token de Cognito:
 
-**Pre-condiciones del `apply` (por entorno y por cuenta).** Si una falla, no se aplica y se vuelve a requisitos (el backend no se toca):
+1. `iss` exacto: `https://cognito-idp.<región>.amazonaws.com/<COGNITO_USER_POOL_ID>`.
+2. `token_use = access`.
+3. `exp` vigente.
+4. **RS256 fijo en `algorithms`; nunca el `alg` del cabecero.**
+5. Firma por JWKS con caché y rotación de claves, y límite de peticiones al endpoint de JWKS.
+6. Convivencia durante la transición: probar primero el verificador antiguo (HS256 con `JWT_SECRET`) y, si falla, el de Cognito (RS256). **No se enruta por el `alg` del cabecero.**
 
-1. **Plataforma que soporta `environmentsecrets` (por confirmar).** La plataforma desplegada puede diferir de `var.solution_stack_name` (`ignore_changes`). Solo lectura: `aws elasticbeanstalk describe-environments --environment-names sigmetum-backend-<env>-env --query "Environments[0].PlatformArn"` y `aws elasticbeanstalk describe-configuration-options --environment-name sigmetum-backend-<env>-env --query "Options[?Namespace=='aws:elasticbeanstalk:application:environmentsecrets']"`; si esta última no devuelve nada, el entorno no lo soporta.
-2. **Los tres parámetros creados y verificados** con los pasos de abajo.
-3. **Quien aplica tiene `iam:PutRolePolicy`** sobre `aws-elasticbeanstalk-ec2-role` en esa cuenta.
-4. **Riesgo aceptado:** `dev` y `prod` se aplican en la misma sesión, sin puerta intermedia: un fallo que `dev` habría destapado se descubre con `prod` ya aplicándose.
+**`C16` (aceptado por el usuario): el backend no valida `client_id` ni grupos, así que cualquier usuario del pool es administrador.** Es válido solo con el registro cerrado (`allow_admin_create_user_only = true`, ya en el módulo) y un pool con solo administradores. Vía de salida: validar `client_id` y/o un grupo `admin` en el backend; exige `COGNITO_CLIENT_ID` o grupos en el backend y, en `dev`, separar el cliente en otro `apply` (ciclo de dependencias); es un cambio de spec. Ver [C16](../estado-y-deuda-tecnica.md#abiertos).
 
-**Crear cada parámetro sin salto de línea final.** Un `file://` con `\n` final guarda un salto de línea en el valor y `validateEnv.js` lo rechaza (un bcrypt lleva `$`, que además no debe expandirse).
+**Tareas del backend (este repositorio no edita el suyo):**
 
-- **PowerShell** (la entrada de `Read-Host` no va al historial ni expande `$`; el `finally` borra el temporal y las variables aunque `aws` falle o se cancele con Ctrl+C):
-  ```powershell
-  $f = Join-Path $env:TEMP "p.tmp"
-  try {
-    $s = Read-Host -AsSecureString "valor"
-    $v = [System.Net.NetworkCredential]::new('', $s).Password
-    [IO.File]::WriteAllText($f, $v)
-    (Get-Item $f).Length
-    Read-Host "Longitud correcta (60 para un bcrypt)? Intro para subir, Ctrl+C para cancelar"
-    aws ssm put-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --type SecureString --value "file://$f" --overwrite --profile <perfil>
-  } finally {
-    Remove-Item $f -ErrorAction SilentlyContinue
-    Remove-Variable v,s -ErrorAction SilentlyContinue
-  }
-  ```
-- **Bash** (`printf '%s'` no añade salto; `IFS= read -r` no expande `$` ni recorta espacios; el subshell hace que el `trap` se ejecute al terminar el bloque, también si `aws` falla):
-  ```bash
-  (
-    f=$(mktemp); trap 'rm -f "$f"; unset v' EXIT
-    IFS= read -rs v; printf '%s' "$v" > "$f"
-    wc -c < "$f"
-    read -rp "Longitud correcta (60 para un bcrypt)? Intro para subir, Ctrl+C para cancelar " _
-    aws ssm put-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --type SecureString --value "file://$f" --overwrite --profile <perfil>
-  )
-  ```
-- **Git Bash en Windows:** `mktemp` devuelve una ruta `/tmp/...` que `aws.exe` (programa de Windows) puede no resolver con `file://`. Usa `--value "file://$(cygpath -m "$f")"` (ruta con forma `C:/...`) o el procedimiento de PowerShell.
-- **Medir el archivo antes de subirlo** (los comandos de arriba ya lo hacen): `(Get-Item $f).Length` en PowerShell y `wc -c < "$f"` en Bash. Un bcrypt debe dar **60**; **61** indica salto de línea final (se repite sin subir). Para `JWT_SECRET` y `EMAIL_PASSWORD` solo se comprueba que no hay un byte de más respecto a lo que se tecleó. Archivo temporal fuera del repositorio y borrado después (no hay borrado seguro garantizado, por confirmar).
+- Añadir `COGNITO_USER_POOL_ID` a `config/validateEnv.js` (hasta entonces, la fila de arriba dice «No»; al exigirla pasa a «Sí» y `docs-check` lo avisará).
+- Implementar el verificador de la lista anterior, en convivencia con el actual.
+- Al final de la transición (`S18`): retirar `POST /log`, `JWT_SECRET` y `ADMIN_*` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`); infra quitará después las tres claves de secretos de `app_env_vars`.
+- `ALLOWED_ORIGIN` debe coincidir con los orígenes de `cognito_callback_urls` (sección 7).
 
-**Verificar:**
+### Procedimiento humano de alta de administrador
 
-1. **Que existen:** `aws ssm describe-parameters --parameter-filters "Key=Name,Option=BeginsWith,Values=/sigmetum/<env>/backend/" --profile <perfil>`, sin leer el valor. El campo `Name` empieza por `/`.
-2. **El valor sin imprimirlo (por confirmar; exige `ssm:GetParameter` con descifrado al operador):** leerlo a una variable y mostrar solo longitud y prefijo (60 y `$2` para el bcrypt; al menos 32 para `JWT_SECRET`). Sin `echo` del valor.
-   - **PowerShell** (si `$v` no es un `string` sino una lista, el valor guardado lleva salto de línea):
-     ```powershell
-     $v = aws ssm get-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --with-decryption --query "Parameter.Value" --output text --profile <perfil>
-     $v -is [string]; $v.Length; $v.Substring(0,2)
-     Remove-Variable v
-     ```
-   - **Bash** (la salida `text` añade un salto, así que un bcrypt correcto da 61 en el `wc` y 60 en `${#v}`; `$(...)` recorta los saltos finales, por eso el `wc` es el que delata uno guardado de más):
-     ```bash
-     aws ssm get-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --with-decryption --query "Parameter.Value" --output text --profile <perfil> | wc -c
-     v=$(aws ssm get-parameter --name "/sigmetum/<env>/backend/<CLAVE>" --with-decryption --query "Parameter.Value" --output text --profile <perfil>); printf '%s %s\n' "${#v}" "${v:0:2}"; unset v
-     ```
+Solo nombres y marcadores: **nunca** una contraseña, un código TOTP ni un valor en un documento, en el historial del terminal ni en un chat. Son acciones que cambian recursos de AWS: las ejecuta el humano, con confirmación expresa y el perfil de la cuenta del entorno. El pool no tiene registro público: los usuarios los crea un administrador.
 
-**Orden de despliegue:**
+1. `aws cognito-idp admin-create-user` con `--user-pool-id <COGNITO_USER_POOL_ID>` y `--username <correo>` (el correo es el nombre de usuario, `username_attributes = ["email"]`, que es **inmutable**: cambiarlo reemplaza el pool). Sin `--temporary-password`: Cognito genera la temporal y la envía por correo (válida tres días).
+2. Primer acceso por el Hosted UI (`cognito_domain_url`): cambiar la contraseña (catorce caracteres mínimo, cuatro clases) y **registrar el TOTP** (MFA obligatorio, `mfa_configuration = "ON"`).
+3. Comprobación de solo lectura: `aws cognito-idp admin-get-user` sobre ese usuario (estado `CONFIRMED`; MFA registrado). No se imprime ni pega nada sensible.
+4. **Segundo administrador de emergencia** (decisión del usuario): otro usuario del pool con otro correo, en manos de **otra persona**, con su propio TOTP. Con recuperación `admin_only` y un solo administrador, perder el TOTP bloquea el acceso y, en `prod`, `deletion_protection` complica rehacer el pool. Por `C16`, ese segundo usuario también es administrador completo.
+5. **Si se pierde el TOTP:** el restablecimiento es una acción que cambia recursos (otro administrador o un `admin-set-user-mfa-preference`/reinicio del usuario); la ejecuta solo el humano y con confirmación expresa. Sin segundo administrador, la salida es rehacer el pool, que en `prod` exige un cambio revisado por `deletion_protection`.
 
-1. Crear los tres parámetros en cada cuenta (`dev` y `prod`) y verificarlos.
-2. Comprobar las pre-condiciones.
-3. Quitar `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` de `app_env_vars` en `terraform.tfvars` de cada entorno (si siguen, `plan` falla por la `validation`).
-4. `terraform plan` (el humano lo revisa sin pegar su salida) y `apply` en `dev` y `prod` en la misma sesión.
-5. Sin cambios en backend ni en frontend.
+### Orden de despliegue del login
 
-**Tras el `apply` (por confirmar):** salud `Ok` y arranque sin error de `validateEnv.js` (exige el bcrypt completo, sin `$` expandido); login real del administrador; con acceso a la instancia (SSH deshabilitado por defecto), `get-config environment -k ADMIN_PASSWORD` comprobando solo la longitud. Y que la configuración del entorno (`describe-configuration-settings`, solo nombres) ya no lista las tres claves en `aws:elasticbeanstalk:application:environment`.
+1. **Infra:** `apply` en `dev` y después en `prod` (el humano). Comprobar: pool, dominio y cliente creados, Beanstalk en `Green` con `COGNITO_USER_POOL_ID`, Hosted UI cargando y los administradores creados con el procedimiento anterior. En `dev`, `ALLOWED_ORIGIN` se rellena tras el primer `apply` (orden humano ya existente).
+2. **Backend:** aceptando ambos tokens (el antiguo y el de Cognito), en `dev` y luego en `prod`.
+3. **Frontend:** compilación nueva con `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` (ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue)).
+4. **Retirar el login antiguo** (primero backend, después infra). **NO se hace hasta verificar en `prod` que el TOTP funciona:** inicio de sesión por Hosted UI con MFA y comprobación del segundo administrador. Además, pasado el plazo fijo (`S18`).
 
-**Si el entorno no se recupera tras el `apply`** (política aún no visible por la propagación de IAM, parámetro ausente o inválido):
+**Vuelta atrás:** frontend con el build anterior y backend con la versión anterior; infra solo con un cambio revisado y con el frontend ya sin Cognito (en `prod`, `deletion_protection` lo impide por `apply` normal).
+
+**Si el entorno no se recupera tras el `apply`:**
 
 1. Solo lectura: `aws elasticbeanstalk describe-events --environment-name sigmetum-backend-<env>-env --max-items 20` y `describe-environments` (`Status`, `Health`).
 2. Esperar a `Ready`: Beanstalk revierte una actualización de configuración fallida. No se aborta a mano (`abort-environment-update` cambia recursos y exige confirmación expresa).
-3. Repetir `terraform apply` en ese entorno; la política ya existe y solo se reintenta el update. Si el entorno queda `Degraded` o `Severe`, consultar antes de actuar; si la causa es un parámetro ausente o inválido, se corrige y se repite el `apply`.
-
-**Rotar un secreto** (paso aparte, posterior; los valores actuales se migran tal cual): sobrescribir el parámetro con el mismo método de arriba (`--overwrite`), reiniciar o redesplegar el entorno para que se relea (**por confirmar** si basta el reinicio) y comprobar el health check. Mientras no se rote, los valores antiguos siguen en versiones previas del estado de Terraform (bucket versionado) y en el `terraform.tfvars` local de quien desplegó.
-
-**Vuelta atrás:** revertir exige revertir el commit completo (la `validation` nueva rechaza las tres claves, así que reponerlas como propiedades de entorno obliga a restaurar también `variables.tf` y a volver a poner los valores en `terraform.tfvars`). La política IAM y los parámetros no se borran solos; el humano los elimina aparte, con confirmación expresa.
+3. Si queda `Degraded` o `Severe`, consultar antes de actuar; una causa probable es un valor de `app_env_vars` que `validateEnv.js` rechaza (sección de reglas de valor).
 
 ## 3. Health check
 
@@ -166,7 +135,7 @@ La política que `modules/storage` añade al rol `aws-elasticbeanstalk-ec2-role`
 | `ObjectsInGalleryAndData` | `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` | `gallery/*` y `data/*` del bucket del entorno | — |
 | `ListGalleryAndData` | `s3:ListBucket` | El bucket | `StringLike` en `s3:prefix`: `gallery/*` o `data/*` |
 
-Además, `modules/beanstalk` añade al mismo rol la política en línea `sigmetum-ssm-secrets-<env>`, con `ssm:GetParameters` y `ssm:GetParameter` solo sobre los tres parámetros de secretos del entorno (`/sigmetum/<env>/backend/<CLAVE>`), sin comodines y sin acceso a S3 (sección 2; **verificado en código, efecto aplicado por confirmar**). No cambia lo que el backend puede hacer en S3.
+`modules/beanstalk` ya no añade ninguna política IAM al rol (la política `sigmetum-ssm-secrets-<env>` de la migración a Parameter Store se retira; si llegó a aplicarse, su baja es un cambio del `apply`, **por confirmar**). No cambia lo que el backend puede hacer en S3.
 
 **Prefijos efectivos que debe respetar el backend:** `gallery/` y `data/` (esto cubre `data/active/`, `data/terms/`, `data/drafts/` y `data/<provincia>/`; `config/s3Paths.js`, verificado). **Sin acceso** para el rol a `assets/`, a la raíz del bucket ni a ningún otro prefijo: esos accesos darán acceso denegado. `assets/*` queda solo para CloudFront.
 
@@ -257,6 +226,8 @@ ALLOWED_ORIGIN = "https://feature-testing.d37662kpg8985h.amplifyapp.com,https://
 
 **Dependencia de orden (infra:C9):** el dominio de `prod` lo crea `modules/amplify` en el `apply` de `prod`; el backend debe aceptar los dos orígenes antes, o el frontend recibiría 403 por CORS. El dominio por defecto de Amplify (`*.amplifyapp.com`) de `prod` no estará en la lista y el backend le dará 403 por CORS. Ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue) (punto 5) para el orden completo. En `dev`, `ALLOWED_ORIGIN` sigue dependiendo de una URL que solo se conoce después de desplegar Amplify.
 
+**Coherencia con Cognito:** los orígenes de `ALLOWED_ORIGIN` deben coincidir con los de los outputs `cognito_callback_urls` (cada origen más `/auth/callback`) de cada entorno, que salen de `module.amplify.site_origins` (los dominios propios si los hay; si no, la URL de la rama). Si difieren, el backend rechaza por CORS o el Hosted UI rechaza la dirección de retorno. No hay `localhost` en ningún entorno.
+
 ## 8. Discrepancias
 
 | Id | Qué pasa | Dónde | Responsable | Qué hacer |
@@ -309,7 +280,8 @@ El bucket de staging lo deriva el workflow del account ID al correr (`elasticbea
 | Si cambias... | Actualiza en este documento | Avisa |
 |---|---|---|
 | Una clave de `app_env_vars` | Sección 2 | PR: qué clave, en qué entorno (solo nombres) |
-| Uno de los tres secretos (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) o su política IAM de lectura | Sección 2 (procedimiento de Parameter Store) y [referencia](../referencia-modulos.md#secretos-en-parameter-store) | PR: qué parámetro y en qué entorno (solo nombres); quién debe crearlo o rotarlo y en qué orden |
+| El pool, el cliente o el dominio de Cognito (`modules/cognito`), o `COGNITO_USER_POOL_ID` | Sección 2 (contrato de login, alta de administrador, orden) y sección 7 (coherencia con `ALLOWED_ORIGIN`) | PR: qué cambia y si afecta a los usuarios o a `iss`; el backend valida el id del pool |
+| Uno de los tres secretos (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) | Sección 2 (aviso S6: visibles en `plan` y estado) | PR: qué clave y en qué entorno (solo nombres) |
 | `HealthCheckPath` u otro ajuste de Beanstalk | Sección 3 | PR |
 | El ALB, el certificado o el DNS | Sección 4 | PR: nuevo dominio o URL |
 | La política IAM de `modules/storage` | Sección 5 (y B2 de la sección 8) | PR: qué acciones o prefijos cambian |

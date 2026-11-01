@@ -9,7 +9,7 @@ Todos los recursos tienen tags aplicados automáticamente por Terraform. Para qu
 | `Project` | `sigmetum` | Filtra todos los costos del proyecto |
 | `Environment` | `dev` / `prod` | Compara costos entre preprod y prod |
 | `ManagedBy` | `terraform` | Identifica recursos gestionados por IaC |
-| `Component` | `backend` / `frontend` / `storage` / `backend-ci` | Desglosa costos por servicio |
+| `Component` | `backend` / `frontend` / `storage` / `backend-ci` / `identity` | Desglosa costos por servicio |
 
 Con estos tags puedes responder preguntas como:
 - ¿Cuánto cuesta el backend en preprod este mes?
@@ -69,6 +69,7 @@ Esto te permite en Cost Explorer agrupar por cuenta con un nombre legible en vez
 
 ## Notas
 
+- `identity` (módulo `cognito`): el etiquetado solo se aplica al pool de usuarios (`aws_cognito_user_pool`); el cliente y el dominio de Cognito no admiten tags en el proveedor 5.x (**por confirmar**). Coste estimado: nivel Essentials de Cognito, que para un solo usuario activo al mes (MAU) debería ser prácticamente nulo o muy bajo (**por confirmar**: la tarifa y el nivel gratuito dependen de la cuenta y de la región; compruébalo en la calculadora de precios de AWS). Las cuotas de MFA por SMS no aplican: el MFA es TOTP.
 - Route53 no soporta tags en sus records — los costos de DNS aparecen sin tag de componente.
 - Los recursos de Beanstalk (instancias EC2, Auto Scaling) heredan los tags del environment.
 - El bucket de tfstate (`sigmetum-tfstate-dev` / `sigmetum-tfstate-prod`) no tiene tag `Component` — es infraestructura de Terraform, no de la app. Su costo es despreciable (pocos KB).

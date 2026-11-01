@@ -1,6 +1,9 @@
 data "aws_region" "current" {}
 
 locals {
+  # Amplify replaces "/" with "-" in branch names for the subdomain
+  branch_url = "https://${replace(var.branch, "/", "-")}.${aws_amplify_app.this.default_domain}"
+
   # Report-Only: the browser logs violations in its console and blocks nothing
   csp_report_only = join("; ", [
     "default-src 'self'",
@@ -8,7 +11,7 @@ locals {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src ${join(" ", compact(["'self'", var.s3_url, "https://*.s3.${data.aws_region.current.name}.amazonaws.com"]))}",
-    "connect-src ${join(" ", compact(["'self'", var.backend_url]))}",
+    "connect-src ${join(" ", compact(["'self'", var.backend_url, var.cognito_domain_url]))}",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -66,6 +69,8 @@ resource "aws_amplify_app" "this" {
             value: "public, max-age=31536000, immutable"
   EOT
 
+  # VITE_COGNITO_DOMAIN and VITE_COGNITO_CLIENT_ID are set only on the branch: in dev the client id depends on the
+  # branch URL (default domain), and the app must not depend on the client. The branch value takes precedence.
   environment_variables = {
     VITE_BASE_URL            = var.backend_url
     VITE_API_PREFIX          = "/api/v1"
@@ -109,6 +114,8 @@ resource "aws_amplify_branch" "this" {
     VITE_API_PREFIX          = "/api/v1"
     VITE_S3_URL              = var.s3_url
     VITE_CAROUSEL_IMAGE_KEYS = var.carousel_image_keys
+    VITE_COGNITO_DOMAIN      = var.cognito_domain_url
+    VITE_COGNITO_CLIENT_ID   = var.cognito_client_id
   }
 }
 

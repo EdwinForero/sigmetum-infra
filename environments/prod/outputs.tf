@@ -23,3 +23,32 @@ output "ci_role_arn" {
   value       = module.backend_ci_iam.role_arn
 }
 
+output "cognito_user_pool_id" {
+  description = "ID of the Cognito user pool (not a secret)."
+  value       = module.cognito.user_pool_id
+}
+
+output "cognito_client_id" {
+  description = "ID of the Cognito app client (not a secret)."
+  value       = module.cognito.client_id
+}
+
+output "cognito_domain_url" {
+  description = "Base URL of the Cognito hosted UI."
+  value       = module.cognito.domain_url
+}
+
+output "cognito_region" {
+  description = "AWS region of the Cognito user pool."
+  value       = module.cognito.region
+}
+
+output "cognito_callback_urls" {
+  description = "Sign-in callback URLs registered in the Cognito app client."
+  value       = module.cognito.callback_urls
+}
+
+output "cognito_logout_urls" {
+  description = "Sign-out URLs registered in the Cognito app client."
+  value       = module.cognito.logout_urls
+}

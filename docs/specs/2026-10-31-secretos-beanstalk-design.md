@@ -1,5 +1,7 @@
 # Secretos de Beanstalk fuera de las propiedades de entorno: spec
 
+Estado: revertido el 31/10/2026 por [login con Cognito](2026-10-31-cognito-login-design.md)
+
 Fecha: 2026-10-31 · Estado: cerrado
 
 ## Objetivo

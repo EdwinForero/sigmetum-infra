@@ -1,5 +1,7 @@
 # Secretos de Beanstalk en Parameter Store: plan
 
+Estado: revertido el 31/10/2026 por [login con Cognito](2026-10-31-cognito-login-design.md)
+
 Fecha: 2026-10-31 · Estado: cerrado (v2, tras "Pedir cambios") · Spec: [design](2026-10-31-secretos-beanstalk-design.md)
 
 ## Pre-condiciones del apply (por entorno y por cuenta)

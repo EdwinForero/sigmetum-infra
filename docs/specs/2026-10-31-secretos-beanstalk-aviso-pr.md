@@ -1,5 +1,7 @@
 # Aviso para PR: secretos de Beanstalk en Parameter Store
 
+Estado: revertido el 31/10/2026 por [login con Cognito](2026-10-31-cognito-login-design.md)
+
 Fecha: 2026-10-31 · Spec: `docs/specs/2026-10-31-secretos-beanstalk-design.md` · Plan: `docs/specs/2026-10-31-secretos-beanstalk-plan.md`
 
 Crítico: sí (IAM y permisos; secretos y `terraform.tfvars`; contrato con el backend, `app_env_vars`). Solo marcadores y nombres: ningún valor, hash ni ARN con cuenta.
@@ -20,10 +22,10 @@ Crítico: sí (IAM y permisos; secretos y `terraform.tfvars`; contrato con el ba
 
 ## Qué debe hacer el humano, en este orden
 
-Procedimiento completo, con los comandos de PowerShell y Bash: [para-backend.md](../integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano). Resumen por entorno (`dev` con el perfil de preprod, `prod` con el de prod):
+Procedimiento completo, con los comandos de PowerShell y Bash: para-backend.md (ancla retirada con la reversión). Resumen por entorno (`dev` con el perfil de preprod, `prod` con el de prod):
 
 1. **Pre-condiciones (solo lectura):** (a) la plataforma desplegada admite `environmentsecrets` (`describe-environments` y `describe-configuration-options` filtrando ese espacio de nombres; si no devuelve nada, **no se aplica** y se vuelve a requisitos); (b) quien aplica tiene `iam:PutRolePolicy` sobre `aws-elasticbeanstalk-ec2-role`.
-2. **Crear los tres parámetros** `/sigmetum/<env>/backend/<CLAVE>` (`SecureString`) sin salto de línea final, midiendo antes el archivo temporal (un bcrypt, 60 bytes) y con limpieza aunque falle `aws`; nunca el valor en `--value` por línea de comandos. Se migran los valores actuales. Comandos y salvedad de Git Bash (`cygpath -m`): [procedimiento](../integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano).
+2. **Crear los tres parámetros** `/sigmetum/<env>/backend/<CLAVE>` (`SecureString`) sin salto de línea final, midiendo antes el archivo temporal (un bcrypt, 60 bytes) y con limpieza aunque falle `aws`; nunca el valor en `--value` por línea de comandos. Se migran los valores actuales. Comandos y salvedad de Git Bash (`cygpath -m`): procedimiento (ancla retirada con la reversión).
 3. **Verificar:** `describe-parameters` (existen; `Name` empieza por `/`), sin leer el valor; opcionalmente, longitud y prefijo sin imprimirlo (comandos en el procedimiento).
 4. **Quitar** `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` de `app_env_vars` en el `terraform.tfvars` de cada entorno (si siguen, `plan` falla por la `validation`).
 5. **`terraform plan`** en cada entorno, sin pegar su salida.

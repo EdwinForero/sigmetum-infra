@@ -59,7 +59,7 @@ const NOT_SECRET = {
 };
 
 // Recursos que admiten etiquetas y deben llevar Component (Project, Environment y ManagedBy llegan por default_tags).
-const TAGGABLE = ['aws_amplify_app', 'aws_amplify_branch', 'aws_elastic_beanstalk_application', 'aws_elastic_beanstalk_environment', 'aws_s3_bucket'];
+const TAGGABLE = ['aws_amplify_app', 'aws_amplify_branch', 'aws_elastic_beanstalk_application', 'aws_elastic_beanstalk_environment', 'aws_s3_bucket', 'aws_cognito_user_pool'];
 
 // ── Lectura de HCL ───────────────────────────────────────────────────────────────────────────────────
 const stripComments = (text) => text.replace(/^\s*#.*$/gm, '').replace(/^\s*\/\/.*$/gm, '');
@@ -250,6 +250,24 @@ const outputs = tfFiles
     }
   }
 
+  // Cognito (SEG-13): el pool exige MFA y solo el administrador crea usuarios; el cliente es público sin contraseña por API
+  for (const pool of resources.filter((r) => r.type === 'aws_cognito_user_pool' && r.dir === 'modules/cognito')) {
+    const key = `${pool.dir}:${pool.label}`;
+    if (!/^\s*mfa_configuration\s*=\s*"ON"/m.test(pool.body)) problems.push(`${key}: el user pool no tiene mfa_configuration = "ON" (SEG-13, ver docs/guias/seguridad.md)`);
+    if (!/software_token_mfa_configuration\s*\{[^}]*\benabled\s*=\s*true/.test(pool.body)) {
+      problems.push(`${key}: el user pool no tiene software_token_mfa_configuration con enabled = true (SEG-13, ver docs/guias/seguridad.md)`);
+    }
+    if (!/allow_admin_create_user_only\s*=\s*true/.test(pool.body)) problems.push(`${key}: el user pool no tiene allow_admin_create_user_only = true (SEG-13, ver docs/guias/seguridad.md)`);
+  }
+  for (const client of resources.filter((r) => r.type === 'aws_cognito_user_pool_client' && r.dir === 'modules/cognito')) {
+    const key = `${client.dir}:${client.label}`;
+    if (!/^\s*generate_secret\s*=\s*false/m.test(client.body)) problems.push(`${key}: el cliente del user pool no tiene generate_secret = false (SEG-13, ver docs/guias/seguridad.md)`);
+    if (/ALLOW_(?:ADMIN_)?USER_PASSWORD_AUTH/.test(client.body)) problems.push(`${key}: el cliente permite login por contraseña por API (ALLOW_USER_PASSWORD_AUTH o ALLOW_ADMIN_USER_PASSWORD_AUTH); solo Hosted UI (SEG-13, ver docs/guias/seguridad.md)`);
+  }
+  for (const file of tfFiles.filter((f) => f.startsWith('modules/cognito/') || f.startsWith('environments/'))) {
+    if (/localhost/i.test(tf[file])) problems.push(`${file}: contiene localhost; las callback_urls y logout_urls de Cognito no pueden apuntar a localhost (SEG-13, ver docs/guias/seguridad.md)`);
+  }
+
   // Variables y outputs
   const secretName = /password|secret|token|key|credential|env_vars/i;
   let undescribed = 0;
@@ -363,8 +381,8 @@ const outputs = tfFiles
     const block = /^app_env_vars\s*=\s*\{([\s\S]*?)^\}/m.exec(existsSync(join(ROOT, file)) ? stripComments(read(file)) : '');
     return new Set([...(block?.[1].matchAll(/^\s+([A-Z][A-Z0-9_]*)\s*=/gm) ?? [])].map((m) => m[1]));
   };
-  // Claves que el backend exige pero llegan de Parameter Store, no de app_env_vars.
-  const SSM_SECRET_KEYS = ['JWT_SECRET', 'EMAIL_PASSWORD', 'ADMIN_PASSWORD'];
+  // Claves que el backend exige y las inyecta Terraform desde Cognito, no están en las plantillas.
+  const INJECTED_KEYS = ['COGNITO_USER_POOL_ID'];
   const validate = join(BACKEND, 'config', 'validateEnv.js');
   if (!existsSync(validate)) notes.push('No existe ../sigmetum-backend/config/validateEnv.js: comprobación de app_env_vars omitida.');
   else {
@@ -372,7 +390,7 @@ const outputs = tfFiles
     if (required.length === 0) notes.push('No se pudo leer la lista required de validateEnv.js.');
     for (const env of environments) {
       const keys = exampleKeys(env);
-      required.filter((key) => !keys.has(key) && !SSM_SECRET_KEYS.includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example no define ${key}, que el backend exige al arrancar`));
+      required.filter((key) => !keys.has(key) && !INJECTED_KEYS.includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example no define ${key}, que el backend exige al arrancar`));
       [...keys].filter((key) => !required.includes(key) && !['PORT', 'TRUST_PROXY_HOPS'].includes(key)).forEach((key) => notes.push(`AVISO environments/${env}/terraform.tfvars.example define ${key}, que el backend no exige (¿sobra?)`));
     }
   }

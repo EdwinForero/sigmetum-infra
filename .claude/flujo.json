@@ -69,6 +69,12 @@
       "docs/referencia-modulos.md",
       "README.md"
     ],
+    "modules/cognito/**": [
+      "docs/referencia-modulos.md",
+      "docs/integracion/para-backend.md",
+      "docs/integracion/para-frontend.md",
+      "docs/guias/seguridad.md"
+    ],
     "modules/backend-ci-iam/**": [
       "docs/referencia-modulos.md",
       "docs/iam-role-setup.md"
@@ -98,6 +104,7 @@
     "modules/storage/**",
     "modules/beanstalk/**",
     "modules/dns/**",
+    "modules/cognito/**",
     "environments/**/variables.tf",
     "environments/**/main.tf",
     "environments/**/*.example",

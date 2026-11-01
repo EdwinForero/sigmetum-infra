@@ -231,10 +231,6 @@ aws iam create-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2
 aws iam add-role-to-instance-profile --instance-profile-name aws-elasticbeanstalk-ec2-role --role-name aws-elasticbeanstalk-ec2-role --profile sigmetum-prod
 ```
 
-### Política de lectura de secretos (la crea Terraform)
-
-El rol `aws-elasticbeanstalk-ec2-role` se crea **a mano** (arriba), pero la política en línea `sigmetum-ssm-secrets-<env>` que le permite leer los tres secretos del backend en Parameter Store la crea Terraform (`modules/beanstalk`), no se crea a mano. Quien ejecuta el `apply` necesita `iam:PutRolePolicy` sobre ese rol en la cuenta del entorno. Los parámetros los crea el humano antes del `apply`: [procedimiento](integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano).
-
 ---
 
 ## Siguiente paso

@@ -29,14 +29,14 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 
 ### SEG-2. Secretos de la aplicación: dónde viven en Beanstalk
 
-- **Por qué:** `app_env_vars` llega a Beanstalk como **propiedades de entorno** del entorno. Quien pueda leer la configuración del entorno (consola o API de Beanstalk) las ve en claro, por eso `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` ya no viajan por ahí.
-- **Regla:** los secretos viven en **Parameter Store (SecureString)** (parámetro `/sigmetum/<env>/backend/<CLAVE>`) y llegan a la aplicación con la integración de Beanstalk para secretos (espacio de nombres `aws:elasticbeanstalk:application:environmentsecrets`, cuyo valor es el ARN del parámetro), con permiso de lectura solo para el rol de las instancias. **Por confirmar** que la plataforma desplegada admita `environmentsecrets`: no se ha comprobado (comprobación y pasos en [para-backend.md](../integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano)). Mientras no se aplique, se restringe quién tiene acceso de lectura a Beanstalk en cada cuenta.
-- **Cómo:** Terraform no crea los parámetros ni lee su valor: los crea una persona antes del `apply`, con el procedimiento de [para-backend.md](../integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano) (nunca un valor en un documento, en el historial ni en `--value`). `quality-check` exige `sensitive = true` en `app_env_vars`, que solo protege la salida de Terraform, no la consola de AWS.
-- **Estado:** los tres secretos se entregan por `environmentsecrets` desde Parameter Store (verificado en `modules/beanstalk/main.tf`; resuelto en código, S6; efecto en AWS **(por confirmar)** hasta el `apply`). Si falta un parámetro o el permiso, el backend no arranca. El backend no cambia.
+- **Por qué:** `app_env_vars` llega a Beanstalk como **propiedades de entorno** del entorno. Quien pueda leer la configuración del entorno (consola o API de Beanstalk) las ve en claro. Tras revertir la migración a Parameter Store (commit `0885804`, 31/10/2026), `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` **vuelven a viajar por ahí**.
+- **Regla:** mientras dure la transición al login con Cognito, los tres secretos van en `app_env_vars` del `terraform.tfvars` de cada entorno (nunca en git ni en documentos) y se **retiran al final de la transición** (`S18`, tras verificar el TOTP en `prod`). **S6 reabierto, sin suposiciones:** `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` vuelven a viajar como propiedades de entorno de Beanstalk. `for_each = nonsensitive(var.app_env_vars)` (`modules/beanstalk/main.tf`) quita la marca de sensible: **pueden verse en la salida de `terraform plan` y en el estado**. No se asume que el proveedor oculte `setting.value`. Mitigaciones existentes: estado cifrado (`aa4b508`) y la regla de no pegar la salida del `plan` en chats ni en PR; además, se restringe quién tiene acceso de lectura a Beanstalk en cada cuenta.
+- **Cómo:** `quality-check` exige `sensitive = true` en `app_env_vars`, que solo protege la salida de Terraform, no la consola de AWS ni el `plan`. Las plantillas `.example` solo llevan marcadores `CHANGE_ME_...` sin forma de hash.
+- **Estado:** **S6 reabierto** (31/10/2026): los tres secretos vuelven a ser propiedades de entorno (verificado en `modules/beanstalk/main.tf`; efecto en AWS **(por confirmar)** hasta el `apply`). Sin Parameter Store, sin `environmentsecrets` y sin política IAM `sigmetum-ssm-secrets-<env>`. Se cierra del todo retirando los tres secretos (`S18`).
 
 ### SEG-3. El estado de Terraform contiene secretos
 
-- **Por qué:** `sensitive = true` oculta el valor en la salida, pero el estado guarda los valores en claro (token de GitHub, `app_env_vars`). `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` ya no se escriben en el estado nuevo (solo su ARN de parámetro), pero siguen en las versiones previas del bucket de estado, que es versionado, hasta que se rotan los tres valores (procedimiento en [para-backend.md](../integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano)).
+- **Por qué:** `sensitive = true` oculta el valor en la salida, pero el estado guarda los valores en claro (token de GitHub, `app_env_vars`). Con la reversión de Parameter Store, `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` **vuelven a escribirse en el estado** y pueden verse en la salida de `terraform plan`; siguen además en las versiones previas del bucket de estado (versionado), que no se purgan.
 - **Regla:** el bucket de estado (uno por cuenta) tiene cifrado, versionado, bloqueo de acceso público y política TLS; solo quien despliega puede leerlo; el `backend "s3"` activa `encrypt` y un bloqueo de concurrencia. El estado nunca se copia a un equipo local ni se pega en una PR.
 - **Cómo:** `quality-check` falla (ya no solo avisa) si un `backend` no tiene `encrypt` o el bloqueo. Operación del bloqueo y del cambio de backend: [mantenimiento.md](mantenimiento.md#estado-remoto-aplicar-el-cambio-de-backend-y-operar-el-bloqueo). El resto depende de la cuenta: **(por confirmar)**.
 - **Estado:** `backend.tf` cifra y bloquea, resuelto en código (S3; efecto en las cuentas por confirmar hasta el `init -reconfigure`). El procedimiento del bucket ya incluye bloqueo de acceso público y política TLS. dev cumple versionado, bloqueo público y cifrado; faltan política TLS y etiquetas (comprobado el 31/10/2026). prod: por confirmar (S4 parcial). Quién puede leerlo es **(por confirmar)** (S2).
@@ -47,7 +47,7 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 - **Regla:**
   - Las políticas nombran acciones y recursos concretos; nunca `Action: *`, `Resource: *` ni `Principal: *` en una sentencia `Allow` (`quality-check` falla con los comodines en `Allow`). **Excepción de `Deny` de TLS:** una sentencia `Effect = "Deny"` con `Principal = "*"` y `Action = "s3:*"` (como `DenyInsecureTransport` de `modules/storage`, condición `aws:SecureTransport = false`) solo restringe y no concede nada, así que no incumple la regla; `quality-check` solo vigila `Principal "*"` y `Action` comodín en sentencias `Allow`.
   - Una cuenta por entorno aísla los roles: el rol `aws-elasticbeanstalk-ec2-role` es el mismo nombre en cada cuenta, y `modules/storage` le añade una política propia del bucket del entorno. Si dos entornos compartieran cuenta, ambos bloques se sumarían en el mismo rol.
-  - `modules/beanstalk` añade al rol de las instancias una política en línea (`sigmetum-ssm-secrets-<env>`) con `ssm:GetParameter` y `ssm:GetParameters` solo sobre los tres parámetros `/sigmetum/<env>/backend/<CLAVE>`; quien aplica necesita `iam:PutRolePolicy` sobre ese rol. Los parámetros son `SecureString` con la clave gestionada por defecto, por lo que no se concede `kms:Decrypt` **(por confirmar)**.
+  - `modules/beanstalk` **no** añade ninguna política IAM al rol de las instancias (la política en línea `sigmetum-ssm-secrets-<env>` de la migración a Parameter Store se retira del código; si llegó a aplicarse en alguna cuenta, su baja es un cambio del `apply`, **por confirmar**).
   - Terraform se ejecuta con el permiso de administrador de SSO. Para automatizarlo (integración continua), se usa un rol con los permisos justos, no administrador ([iam-role-setup.md](../iam-role-setup.md)).
 - **Cómo:** `quality-check` (comodines en políticas); el resto es revisión manual de cada cambio en `modules/storage` y de las políticas gestionadas de los roles de Beanstalk.
 - **Estado:** la política IAM de `modules/storage` se limita a `GetObject`, `PutObject` y `DeleteObject` sobre `gallery/*` y `data/*`, y a `ListBucket` con condición de `s3:prefix` (`gallery/*`, `data/*`); sin comodines en `Action` y sin acceso a `assets/*` (S7 resuelto en código, verificado en `modules/storage/main.tf`; efecto aplicado **(por confirmar)**). Dependencia del `apply`: el backend debe tratar `AccessDenied` (S15). Los roles se crearon a mano (M3). Terraform corre con administrador de SSO (S14).
@@ -107,6 +107,14 @@ Normas para no introducir vulnerabilidades en la infraestructura de SIGMETUM-A, 
 2. Si hay un secreto expuesto (clave, token, contraseña), **se rota primero** y después se limpia el historial.
 3. Se anota en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md) una vez resuelta, sin detalles que faciliten reproducirla.
 
+### SEG-13. Login de administrador con Cognito (propuesto)
+
+- **Por qué:** el login antiguo (HS256 con `JWT_SECRET` y un hash de contraseña en una variable de entorno) concentra los secretos en Beanstalk. Cognito los saca de ahí, pero el cambio de modelo debe ser verificable.
+- **Regla (controles de infraestructura verificables):** MFA TOTP `ON` (`mfa_configuration = "ON"`); registro cerrado (`allow_admin_create_user_only = true`); cliente sin secreto (`generate_secret = false`); `deletion_protection` activa en `prod`; ninguna dirección de retorno `localhost` (los retornos salen de `site_origins`); sin comodines ni secretos en el módulo. **PKCE (`code_challenge` S256 y `code_verifier`) es un requisito del frontend, no comprobable desde infra:** Terraform no lo impone ni lo verifica.
+- **Riesgos aceptados:** **C16**, el backend no valida `client_id` ni grupos: cualquier usuario del pool es administrador, válido solo con el registro cerrado y un pool de solo administradores. `dev` sin `deletion_protection` (aceptado). `username_attributes = ["email"]` es inmutable y reemplazaría el pool. Con `admin_only` y un solo administrador, perder el TOTP bloquea el acceso: hay un segundo administrador de emergencia por procedimiento humano.
+- **Cómo:** `quality-check` **falla** (comprobación automática) si en `modules/cognito` el pool no tiene MFA `ON` con TOTP (`software_token_mfa_configuration` con `enabled = true`), si no tiene el alta solo por administrador (`allow_admin_create_user_only = true`), si el cliente no tiene `generate_secret = false` o permite `ALLOW_USER_PASSWORD_AUTH` o `ALLOW_ADMIN_USER_PASSWORD_AUTH` (sin flujos de contraseña por API; solo Hosted UI), o si algún `.tf` de `modules/cognito/` o `environments/` contiene `localhost`; además vigila comodines, secretos y la etiqueta `Component` del pool. **No comprueba** PKCE (requisito del frontend, fuera de infra) ni `deletion_protection` en `prod`, que se revisa a mano. Detalle en [mantenimiento.md](mantenimiento.md#lo-que-comprueba-node-scriptsquality-checkmjs). El procedimiento y el orden de despliegue están en [para-backend.md](../integracion/para-backend.md#procedimiento-humano-de-alta-de-administrador). No se retira el login antiguo hasta verificar el TOTP en `prod` (`S18`).
+- **Estado:** módulo en código (verificado con `validate`; atributos del proveedor y disponibilidad en `eu-west-3` **(por confirmar)**); efecto en AWS **(por confirmar)** hasta el `apply`.
+
 ## 3. Lista de comprobación para una PR
 
 Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o variables sensibles.
@@ -120,6 +128,7 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 - [ ] HTTPS en lo que sirva tráfico real; certificado en la región del proveedor.
 - [ ] Sin `terraform apply` ni `destroy` sin confirmación expresa; `plan` sin pegar en la PR.
 - [ ] Si hay que rotar un secreto, la PR lo dice y dice quién debe hacerlo (solo nombres de variables).
+- [ ] Si toca Cognito: MFA `ON`, registro cerrado, cliente sin secreto, sin `localhost` y `deletion_protection` en `prod` (SEG-13).
 - [ ] Para cambios de IAM, red o secretos, se pasa además la revisión `/security-review` de Claude Code.
 
 ## 4. Estado actual (revisión del 30/09/2026)
@@ -130,7 +139,7 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | `terraform.tfvars`, estado y `.terraform/` versionados | **No** |
 | Variables con secretos con `sensitive = true` | Sí |
 | Identificadores de cuenta en documentos | Ninguno (S1, resuelto) |
-| Secretos de la aplicación en propiedades de entorno de Beanstalk | No en código: `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD` van por Parameter Store y `environmentsecrets` (S6 resuelto en código); efecto, plataforma y rotación de las versiones previas del estado **(por confirmar)** |
+| Secretos de la aplicación en propiedades de entorno de Beanstalk | **Sí, en código**: `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` vuelven a `app_env_vars` y pueden verse en `plan` y en el estado (S6 reabierto); se retiran con `S18` |
 | Estado remoto: versionado | Sí (a mano) |
 | Estado remoto: cifrado explícito, bloqueo, política TLS, bloqueo de acceso público | Parcial: cifrado y bloqueo en código; política TLS por aplicar en dev y por confirmar en prod (S3, S4) |
 | Bucket de datos: bloqueo de acceso público, cifrado, versionado | Sí |
@@ -149,6 +158,7 @@ Márcala **siempre** que el cambio toque IAM, S3, secretos, red, TLS, Amplify o 
 | Token de GitHub de alcance `repo` | Sí, clásico (S10) |
 | CloudTrail, alertas de facturación, registros en CloudWatch | **(por confirmar)** / registros desactivados (S11) |
 | Terraform ejecutado con permiso de administrador | Sí (S14) |
+| Login de administrador con Cognito (SEG-13): MFA `ON` con TOTP, alta solo por administrador, cliente sin secreto, sin `localhost`, sin flujos de contraseña por API | Comprobado por `quality-check` (falla); PKCE y `deletion_protection` en `prod` no son automáticos; efecto en AWS por confirmar hasta el `apply` |
 
 ## 5. Mantener esta guía
 

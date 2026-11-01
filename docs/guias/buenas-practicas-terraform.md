@@ -22,7 +22,7 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 - **Regla:** toda variable lleva `type` y `description`. Lleva `validation` cuando hay valores que no tienen sentido (como `load_balancer_type`). Un secreto lleva `sensitive = true`. Los valores por defecto son seguros (por ejemplo, SSH cerrado). Nada de valores reales en `terraform.tfvars.example`: solo marcadores (`CHANGE_ME_...`, `YOUR_...`).
 - **Por qué:** la descripción es la documentación que ve quien lee `terraform plan`; la validación falla antes de tocar AWS; `sensitive` evita imprimir el valor en la salida.
 - **Cómo:** `quality-check` falla con variables nuevas sin `type` o `description`, con nombres de secreto (`password`, `secret`, `token`, `key`, `env_vars`) sin `sensitive = true`, y con secretos o identificadores de cuenta en los ejemplos. `docs-check` compara las variables con la referencia.
-- **Estado:** cumple. Todas tienen `type` y `description` (M7, resuelto). `app_env_vars` de `modules/beanstalk` lleva una `validation` que exige en `plan` las nueve claves obligatorias del backend, por nombre y sin revelar valores, también sobre un mapa sensible (prueba desechable con Terraform 1.15.5; con 1.5 **(por confirmar)**). La comprobación con los `terraform.tfvars` reales queda para el `plan` de quien despliega **(por confirmar)**.
+- **Estado:** cumple. Todas tienen `type` y `description` (M7, resuelto). `app_env_vars` de `modules/beanstalk` lleva una `validation` que exige en `plan` las nueve claves obligatorias del backend (`JWT_SECRET`, `JWT_EXPIRATION`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `EMAIL`, `EMAIL_PASSWORD`, `AWS_REGION`, `AWS_BUCKET_NAME` y `ALLOWED_ORIGIN`, otra vez con los tres secretos tras revertir Parameter Store) más `COGNITO_USER_POOL_ID` (la inyecta el entorno), por nombre y sin revelar valores, también sobre un mapa sensible (prueba desechable con Terraform 1.15.5; con 1.5 **(por confirmar)**). La comprobación con los `terraform.tfvars` reales queda para el `plan` de quien despliega **(por confirmar)**.
 
 ### BP-3. Outputs: solo lo necesario y nunca secretos
 
@@ -72,6 +72,7 @@ Normas para escribir y cambiar la infraestructura de este repositorio, con el es
 - **Por qué:** un `destroy` o un cambio de nombre que fuerce el reemplazo borraría la investigación subida por el equipo.
 - **Cómo:** `quality-check` avisa de los buckets sin `prevent_destroy`.
 - **Estado:** el bucket de datos tiene `prevent_destroy = true` en `modules/storage/main.tf` (M6 resuelto en código, verificado): `destroy` falla en ambos entornos hasta que se quite de forma revisada ([README](../../README.md#destruir-un-entorno) explica el vaciado manual). No tiene `force_destroy`. El bucket de estado no lo gestiona Terraform (M3).
+- **Pool de Cognito:** `deletion_protection = "ACTIVE"` solo en `prod` (`var.environment == "prod"`: `prevent_destroy` no admite condiciones) para el pool de usuarios; **`dev` queda sin protección, aceptado por el usuario**. Borrar o reemplazar el pool borra los usuarios y sus TOTP; en `prod` hace falta un cambio revisado. El motivo y cómo rehacerlo están en el [README](../../README.md#destruir-un-entorno). Cambiar `username_attributes` fuerza el reemplazo del pool (inmutable).
 
 ### BP-9. Costes
 
@@ -106,7 +107,7 @@ Lo que no se debe imitar y ya está registrado:
 | `NODE_ENV` ya no se define en Amplify (M2): resuelto en código, pendiente del `apply` de `dev` y de la verificación; `prod` por confirmar | `modules/amplify/main.tf` | M2 |
 | Nombre del rol de Beanstalk escrito a mano en el módulo de almacenamiento (acopla el módulo a un rol creado fuera de Terraform) | `modules/storage/main.tf` | M3, S7 |
 | `output` que construye una URL con `/` en el nombre de rama | `modules/amplify/outputs.tf` | C8 |
-| Secretos pasados como propiedades de entorno de Beanstalk | `modules/beanstalk/main.tf` | S6 |
+| Secretos pasados como propiedades de entorno de Beanstalk (**reabierto** al revertir Parameter Store: `for_each = nonsensitive(var.app_env_vars)` los deja visibles en `plan` y estado; se retiran con `S18`) | `modules/beanstalk/main.tf` | S6 |
 
 ## 2. Estado actual (revisión del 30/09/2026)
 

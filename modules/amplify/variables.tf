@@ -43,6 +43,18 @@ variable "carousel_image_keys" {
   default     = ""
 }
 
+variable "cognito_domain_url" {
+  description = "Base URL of the Cognito hosted UI, injected as VITE_COGNITO_DOMAIN (branch only) and added to the connect-src of the CSP. Empty omits it."
+  type        = string
+  default     = ""
+}
+
+variable "cognito_client_id" {
+  description = "ID of the Cognito app client, injected as VITE_COGNITO_CLIENT_ID (branch only)."
+  type        = string
+  default     = ""
+}
+
 variable "custom_domains" {
   description = "Custom domains for the deployed branch: root domain name => subdomain prefixes (\"\" is the apex, \"www\" is www.<root>). Empty creates no domain association."
   type        = map(list(string))

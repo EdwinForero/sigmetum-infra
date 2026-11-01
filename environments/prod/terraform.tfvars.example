@@ -31,9 +31,18 @@ app_env_vars = {
   # Nombre del bucket S3 — debe coincidir con bucket_name de arriba.
   AWS_BUCKET_NAME = "sigmetum-app-assets-prod"
 
-  # Secretos (no van aquí): JWT_SECRET, ADMIN_PASSWORD y EMAIL_PASSWORD viven en Parameter Store
-  # como SecureString, en /sigmetum/prod/backend/<CLAVE>. Se crean a mano; Terraform no lee ni escribe
-  # su valor. Procedimiento: docs/integracion/para-backend.md (sección «Secretos en Parameter Store: procedimiento humano»). La validation de app_env_vars rechaza las tres claves.
+  # Secretos del backend. Viajan como propiedades de entorno de Beanstalk y pueden verse en la salida de
+  # terraform plan y en el estado: no pegues esa salida. Se retiran al final de la transición a Cognito (S18).
+  # JWT_SECRET: al menos 32 caracteres aleatorios.
+  JWT_SECRET = "CHANGE_ME_jwt_signing_value"
+
+  # ADMIN_PASSWORD: hash bcrypt de la contraseña del administrador inicial (no la contraseña en claro).
+  ADMIN_PASSWORD = "CHANGE_ME_admin_bcrypt_hash"
+
+  # EMAIL_PASSWORD: contraseña de aplicación de la cuenta EMAIL.
+  EMAIL_PASSWORD = "CHANGE_ME_email_app_credential"
+
+  # COGNITO_USER_POOL_ID no va aquí: la inyecta Terraform desde el módulo cognito.
 
   # Duración del token JWT (ej. "10m", "1h", "7d").
   JWT_EXPIRATION = "10m"

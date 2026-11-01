@@ -18,7 +18,7 @@ module "beanstalk" {
   ssl_certificate_arn = var.ssl_certificate_arn
 
   notification_email = var.notification_email
-  app_env_vars       = var.app_env_vars
+  app_env_vars       = merge(var.app_env_vars, { COGNITO_USER_POOL_ID = module.cognito.user_pool_id })
 }
 
 module "storage" {
@@ -46,6 +46,14 @@ module "backend_ci_iam" {
   access_logs_bucket_name = module.storage.access_logs_bucket_name
 }
 
+module "cognito" {
+  source      = "../../modules/cognito"
+  environment = "prod"
+
+  domain_prefix   = "sigmetum-a-prod"
+  allowed_origins = module.amplify.site_origins
+}
+
 module "amplify" {
   source      = "../../modules/amplify"
   environment = "prod"
@@ -55,6 +63,9 @@ module "amplify" {
   branch              = "master"
   backend_url         = "https://backend.sigmetum-a.org"
   s3_url              = module.storage.cdn_url
+
+  cognito_domain_url = module.cognito.domain_url
+  cognito_client_id  = module.cognito.client_id
 
   # Apex and www serve the same app from master; both must be in ALLOWED_ORIGIN (deploy the backend first)
   custom_domains = {

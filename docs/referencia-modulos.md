@@ -42,7 +42,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `ssh_key_name` | string | `""` | Par de claves EC2; vacío desactiva SSH |
 | `ssh_allowed_cidrs` | list(string) | `[]` | CIDR con acceso SSH; solo aplica si hay `ssh_key_name` |
 | `notification_email` | string | — | Correo de las notificaciones SNS del entorno |
-| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible). Solo claves no secretas, en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` las seis claves obligatorias no secretas (por nombre, no por valor), acepta claves extra y **rechaza** `JWT_SECRET`, `EMAIL_PASSWORD` y `ADMIN_PASSWORD`, que llegan de [Parameter Store](#secretos-en-parameter-store) |
+| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible), **secretos incluidos**: tabla en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` las nueve claves del backend más `COGNITO_USER_POOL_ID` (por nombre, no por valor; esta última la inyecta el entorno, ver [Claves inyectadas por Terraform](#claves-inyectadas-por-terraform)) y acepta claves extra. Aviso S6: `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` viajan como propiedades de entorno y, con `nonsensitive`, pueden verse en la salida de `terraform plan` y en el estado |
 
 ### Outputs
 
@@ -112,7 +112,7 @@ Además, la app lleva `custom_headers` (caché y seguridad, en `dev` y `prod`) y
 - **Cabeceras** (`custom_headers` de `aws_amplify_app.this`): `Strict-Transport-Security: max-age=86400` (un día, sin `includeSubDomains` ni `preload`), `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (sin cámara, micrófono, geolocalización, pago ni USB) y `Content-Security-Policy-Report-Only` (solo informa, no bloquea). `Cache-Control: no-cache` en `/index.html` y `public, max-age=31536000, immutable` en `/assets/*`; ese patrón es el `dist/assets/` de Vite, no los ficheros del bucket (otro origen, CloudFront). La CSP se calcula en `locals` con `s3_url`, `backend_url` y la región del proveedor (`data.aws_region.current`): sin orígenes hardcodeados, así que `dev` y `prod` salen distintas. Efecto en AWS **(por confirmar)** hasta el `apply` y un build nuevo.
 - **Dominio**: `aws_amplify_domain_association.this` (uno por clave de `custom_domains`, con `wait_for_verification = false`, de modo que el `apply` no espera a la validación del certificado; Amplify gestiona el certificado por validación DNS).
 - **Registros de Route53** (`modules/dns` no cambia): el módulo consulta con `data.aws_route53_zone.custom` la zona pública que se llama igual que el dominio raíz y que debe estar en la cuenta donde se aplica. Crea `aws_route53_record.certificate_validation` (CNAME de validación del certificado), `aws_route53_record.apex` (alias de tipo A hacia la distribución de CloudFront que indica Amplify, porque un CNAME no se permite en el apex) y `aws_route53_record.subdomain` (CNAME para `www`, TTL 300). Sin AAAA y sin `allow_overwrite`: si ya existe un registro de apex o `www`, el `apply` falla con "already exists" y no pisa nada. Los destinos salen de `certificate_verification_dns_record` y `dns_record` de la asociación; si Amplify los devuelve vacíos en el primer `apply`, se repite el `apply` (la asociación ya está en el estado). Formato real de esos campos y alias del apex **(por confirmar)** hasta el `apply`.
-- Sin outputs nuevos; `branch_url` sigue siendo la URL del dominio por defecto, que sigue activa.
+- `branch_url` sigue siendo la URL del dominio por defecto, que sigue activa. `site_origins` es la lista de orígenes del frontend (los dominios propios si los hay; si no, `branch_url`); ambos comparten una expresión (`local.branch_url`) y `site_origins` alimenta `allowed_origins` de `modules/cognito`.
 
 ### Variables
 
@@ -126,6 +126,8 @@ Además, la app lleva `custom_headers` (caché y seguridad, en `dev` y `prod`) y
 | `backend_url` | string | — | URL base del backend inyectada como `VITE_BASE_URL` |
 | `s3_url` | string | `""` | URL base de CloudFront inyectada como `VITE_S3_URL`; usar `module.storage.cdn_url` (`dev` y `prod`) |
 | `carousel_image_keys` | string | `""` | Claves S3 separadas por comas inyectadas como `VITE_CAROUSEL_IMAGE_KEYS` |
+| `cognito_domain_url` | string | `""` | URL base del Hosted UI de Cognito: se inyecta como `VITE_COGNITO_DOMAIN` (solo rama) y se añade al `connect-src` de la CSP; vacío la omite |
+| `cognito_client_id` | string | `""` | Id del cliente de Cognito, inyectado como `VITE_COGNITO_CLIENT_ID` (solo rama) |
 | `custom_domains` | map(list(string)) | `{}` | Dominio raíz => prefijos de subdominio (`""` es el apex, `"www"` es `www.<raíz>`). Vacío no crea asociación ni registros. La clave debe ser un nombre en minúsculas, sin esquema, ruta ni puerto (`validation`) |
 
 ### Outputs
@@ -135,6 +137,7 @@ Además, la app lleva `custom_headers` (caché y seguridad, en `dev` y `prod`) y
 | `app_id` | Id de la app de Amplify |
 | `default_domain` | Dominio por defecto (`*.amplifyapp.com`) |
 | `branch_url` | URL de la rama (`https://<rama>.<dominio>`); las `/` del nombre de rama se sustituyen por `-` |
+| `site_origins` | Orígenes (`https://host`, sin barra final) desde los que se sirve el frontend: los dominios propios si `custom_domains` no está vacío; si no, `branch_url` |
 
 ### Variables de Amplify
 
@@ -146,6 +149,8 @@ Variables de entorno que el módulo define en la app y en la rama. Se comparan c
 | `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` → `module.storage.cdn_url` (URL de CloudFront) |
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` |
+| `VITE_COGNITO_DOMAIN` | Solo rama | `cognito_domain_url` → `module.cognito.domain_url`. Solo en la rama por el ciclo de `dev` (`beanstalk` → `cognito` → `amplify` → `beanstalk`): la app depende del dominio de Cognito solo para la CSP; con una rama por app equivale, porque la variable de rama prevalece (**por confirmar**) |
+| `VITE_COGNITO_CLIENT_ID` | Solo rama | `cognito_client_id` → `module.cognito.client_id`. Mismo motivo |
 
 Amplify ya no define `NODE_ENV` (M2). Vite fija `production` en `vite build` y Vitest fija `test`. Fijar `production` en toda la app haría que `npm ci` omitiera las `devDependencies` (se perderían `vite` y `vitest`) y que Vitest usara el React de producción, donde `act` no funciona. Con `NODE_ENV=dev`, React elegía su build de desarrollo aunque Vite imprimiera «building for production».
 
@@ -166,6 +171,38 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 |---|---|
 | `zone_id` | Id de la zona de Route53 |
 | `backend_fqdn` | Nombre completo del registro del backend |
+
+## Módulo cognito
+
+Pool de usuarios de Amazon Cognito, dominio del Hosted UI y cliente público para el login del administrador. Los atributos del proveedor `aws ~> 5.0` y la disponibilidad de Cognito en `eu-west-3` están **(por confirmar)**: `terraform validate` solo comprueba que los nombres existan. Contrato con el backend y el frontend en [para-backend.md](integracion/para-backend.md#login-con-cognito-contrato-del-backend) y [para-frontend.md](integracion/para-frontend.md#login-con-cognito-hosted-ui).
+
+- **Pool** (`aws_cognito_user_pool.this`, nombre `<app_name>-<entorno>`): MFA `ON` con TOTP, `username_attributes = ["email"]` (**inmutable**: cambiarlo reemplaza el pool y borra usuarios y TOTP), registro cerrado (`allow_admin_create_user_only`), contraseña de 14 caracteres con las cuatro clases (temporal válida 3 días), recuperación `admin_only`, `deletion_protection` `ACTIVE` **solo en `prod`** (`dev` sin protección: aceptado), etiqueta `Component = "identity"`.
+- **Dominio** (`aws_cognito_user_pool_domain.this`): prefijo `domain_prefix` (único por región; si está ocupado el `apply` falla).
+- **Cliente** (`aws_cognito_user_pool_client.this`, nombre `<app_name>-<entorno>-web`, **por confirmar**): sin secreto, flujo OAuth `code`, ámbitos `openid` y `email`, solo proveedor `COGNITO`, `ALLOW_REFRESH_TOKEN_AUTH` como único flujo de autenticación explícito (sin SRP, decisión del usuario; si el `apply` lo rechaza, es una pregunta a la puerta), tokens de acceso e id de 60 minutos y refresco de 8 horas, revocación activa. **PKCE es un requisito del frontend**, no un control de este módulo.
+- **Direcciones de retorno:** cada `allowed_origins` más `callback_path` y `logout_path`; el entorno pasa `module.amplify.site_origins`. Sin `localhost`.
+- **`C16`:** el backend no valida `client_id` ni grupos; cualquier usuario del pool es administrador (válido solo con el registro cerrado).
+
+### Variables
+
+| Variable | Tipo | Por defecto | Descripción |
+|---|---|---|---|
+| `environment` | string | — | `dev` o `prod`; forma el nombre del pool y activa `deletion_protection` solo en `prod` |
+| `app_name` | string | `sigmetum` | Prefijo del nombre del pool: `<app_name>-<entorno>` |
+| `domain_prefix` | string | — | Prefijo del dominio del Hosted UI (`<prefijo>.auth.<región>.amazoncognito.com`); minúsculas, números y guiones, sin `aws`, `amazon` ni `cognito`. Único por región |
+| `allowed_origins` | list(string) | — | Orígenes del frontend (`https://host`, sin barra final) con permiso de retorno; sin `validation` porque en `dev` se desconocen hasta el `apply` |
+| `callback_path` | string | `/auth/callback` | Ruta de retorno del inicio de sesión (debe empezar por `/`) |
+| `logout_path` | string | `/` | Ruta de retorno del cierre de sesión (debe empezar por `/`) |
+
+### Outputs
+
+| Output | Descripción |
+|---|---|
+| `user_pool_id` | Id del pool; la región es su prefijo. Es lo único que recibe el backend (`COGNITO_USER_POOL_ID`) |
+| `client_id` | Id del cliente público (sin secreto) |
+| `domain_url` | URL base del Hosted UI (`https`, sin barra final) |
+| `region` | Región del pool |
+| `callback_urls` | URL de retorno del inicio de sesión registradas en el cliente |
+| `logout_urls` | URL de cierre de sesión registradas en el cliente |
 
 ## Módulo backend-ci-iam
 
@@ -191,7 +228,7 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## Entorno dev
 
-`environments/dev`: instancia única sin balanceador, Amplify en la rama `feature/testing`. Estado remoto en el bucket de la cuenta de preprod. Plantilla de valores: `environments/dev/terraform.tfvars.example`.
+`environments/dev`: instancia única sin balanceador, Amplify en la rama `feature/testing`. Estado remoto en el bucket de la cuenta de preprod. Cognito con el prefijo de dominio `sigmetum-a-dev` y `deletion_protection` inactiva. Plantilla de valores: `environments/dev/terraform.tfvars.example`.
 
 ### Variables
 
@@ -213,10 +250,16 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | `s3_bucket` | Nombre del bucket |
 | `cdn_url` | URL HTTPS de CloudFront para los assets del frontend |
 | `ci_role_arn` | ARN del rol IAM para GitHub Actions CI (de `module.backend_ci_iam`) |
+| `cognito_user_pool_id` | Id del pool de Cognito (no es un secreto) |
+| `cognito_client_id` | Id del cliente de Cognito (no es un secreto) |
+| `cognito_domain_url` | URL base del Hosted UI de Cognito |
+| `cognito_region` | Región del pool de Cognito |
+| `cognito_callback_urls` | URL de retorno del inicio de sesión registradas en el cliente |
+| `cognito_logout_urls` | URL de cierre de sesión registradas en el cliente |
 
 ## Entorno prod
 
-`environments/prod`: ALB con autoescalado y HTTPS, DNS en Route53, Amplify en `master` (con `s3_url = module.storage.cdn_url`) y `custom_domains` fijo en `main.tf` (no es una variable del entorno): el dominio raíz de la zona con el apex y `www`; `dev` no lo define y por eso no crea dominio ni registros. Estado remoto en el bucket de la cuenta de prod. Plantilla de valores: `environments/prod/terraform.tfvars.example`.
+`environments/prod`: ALB con autoescalado y HTTPS, DNS en Route53, Amplify en `master` (con `s3_url = module.storage.cdn_url`) y `custom_domains` fijo en `main.tf` (no es una variable del entorno): el dominio raíz de la zona con el apex y `www`; `dev` no lo define y por eso no crea dominio ni registros. Estado remoto en el bucket de la cuenta de prod. Cognito con el prefijo de dominio `sigmetum-a-prod` y `deletion_protection` activa (las dos únicas divergencias de Cognito entre entornos). Plantilla de valores: `environments/prod/terraform.tfvars.example`.
 
 ### Variables
 
@@ -238,37 +281,35 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 | `amplify_url` | URL de la rama de Amplify |
 | `s3_bucket` | Nombre del bucket |
 | `ci_role_arn` | ARN del rol IAM para GitHub Actions CI (de `module.backend_ci_iam`) |
+| `cognito_user_pool_id` | Id del pool de Cognito (no es un secreto) |
+| `cognito_client_id` | Id del cliente de Cognito (no es un secreto) |
+| `cognito_domain_url` | URL base del Hosted UI de Cognito |
+| `cognito_region` | Región del pool de Cognito |
+| `cognito_callback_urls` | URL de retorno del inicio de sesión registradas en el cliente |
+| `cognito_logout_urls` | URL de cierre de sesión registradas en el cliente |
 
 ## app_env_vars
 
-Claves del mapa `app_env_vars` de los dos entornos. El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. Esta tabla solo recoge las claves **no secretas**, cuyos valores viven en `terraform.tfvars` (ignorado por git). Los tres secretos que el backend también exige (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) ya no van aquí: están en [Secretos en Parameter Store](#secretos-en-parameter-store). La variable `app_env_vars` de `modules/beanstalk` lleva dos `validation`: la primera comprueba en `plan` que estén las seis claves obligatorias de la tabla (solo los nombres, nunca los valores) y la segunda falla si aparece alguno de los tres secretos; las demás (`PORT` y `TRUST_PROXY_HOPS`) son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza.
+Claves del mapa `app_env_vars` de los dos entornos (las que pone el humano en `terraform.tfvars`, ignorado por git). El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. **Incluye los tres secretos** (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`), que vuelven aquí al revertir la migración a Parameter Store: **aviso S6**, viajan como propiedades de entorno de Beanstalk, `for_each = nonsensitive(var.app_env_vars)` quita la marca de sensible y pueden verse en la salida de `terraform plan` y en el estado (no pegues esa salida). La variable de `modules/beanstalk` lleva una `validation` que comprueba en `plan` las nueve claves obligatorias de la tabla más `COGNITO_USER_POOL_ID` (solo los nombres, nunca los valores); `PORT` y `TRUST_PROXY_HOPS` son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza.
 
 | Clave | Obligatoria en el backend | Notas |
 |---|---|---|
 | `PORT` | No | Puerto del proceso; el proxy de Beanstalk reenvía el puerto 80 al 8000 |
 | `AWS_REGION` | Sí | Región del bucket; la del proveedor de Terraform |
 | `AWS_BUCKET_NAME` | Sí | Debe coincidir con `bucket_name` |
+| `JWT_SECRET` | Sí | **Secreto (S6).** Al menos 32 caracteres; distinto en cada entorno. Se retira al final de la transición a Cognito (`S18`) |
 | `JWT_EXPIRATION` | Sí | Duración del token |
 | `ADMIN_USERNAME` | Sí | Usuario administrador |
-| `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#resueltos)). Admite una lista separada por comas; en `prod`, `https://<dominio>,https://www.<dominio>` (ver [para-backend.md](integracion/para-backend.md#7-allowed_origin-por-entorno)) |
+| `ADMIN_PASSWORD` | Sí | **Secreto (S6).** Hash bcrypt completo (60 caracteres, sin salto de línea final), nunca el texto en claro. Se retira en `S18` |
+| `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#resueltos)). Admite una lista separada por comas; en `prod`, `https://<dominio>,https://www.<dominio>` (ver [para-backend.md](integracion/para-backend.md#7-allowed_origin-por-entorno)). Debe coincidir con los orígenes de `cognito_callback_urls` |
 | `EMAIL` | Sí | Cuenta de correo del backend |
+| `EMAIL_PASSWORD` | Sí | **Secreto (S6).** Contraseña de aplicación, no la de la cuenta |
 | `TRUST_PROXY_HOPS` | No | Saltos de proxy de confianza del backend: cadena entera de 1 a 5, sin espacios ni ceros a la izquierda (el 0 solo con `NODE_ENV` `local` o `test`); 1 si no se define. `dev` y `prod` llevan el mismo valor; el de `dev` está medido en nginx y deducido en Express, y el de `prod` está por confirmar (ver [para-backend.md](integracion/para-backend.md#6-plataforma-tamaño-de-instancia-y-correo-saliente)) |
 
-## Secretos en Parameter Store
+## Claves inyectadas por Terraform
 
-Los tres secretos que el backend exige al arrancar no son propiedades de entorno en claro ni claves de `app_env_vars`: viven en Parameter Store como `SecureString` y `modules/beanstalk` solo los **referencia** por ARN. El backend sigue leyendo las mismas variables de entorno, con los mismos nombres y las mismas reglas de `validateEnv.js`. **(verificado en código; efecto en AWS por confirmar hasta que el humano cree los parámetros y aplique)**
+Claves que Terraform añade a `app_env_vars` en `main.tf` de cada entorno (`merge`), a partir de otros módulos. **No** van en `terraform.tfvars` ni en las plantillas `.example`. **(verificado en código; efecto en AWS por confirmar hasta el `apply`)**
 
-| Variable | Obligatoria en el backend | Parámetro (por entorno) | Notas |
-|---|---|---|---|
-| `JWT_SECRET` | Sí | `/sigmetum/<env>/backend/JWT_SECRET` | `SecureString`; de al menos 32 caracteres; distinto en cada entorno |
-| `EMAIL_PASSWORD` | Sí | `/sigmetum/<env>/backend/EMAIL_PASSWORD` | `SecureString`; contraseña de aplicación, no la de la cuenta |
-| `ADMIN_PASSWORD` | Sí | `/sigmetum/<env>/backend/ADMIN_PASSWORD` | `SecureString`; hash bcrypt completo (60 caracteres, sin salto de línea final), nunca el texto en claro |
-
-`<env>` es `dev` o `prod` (`var.environment`). Los dos entornos usan el mismo mecanismo; solo cambia el nombre del parámetro.
-
-- **Quién crea los parámetros:** el humano, a mano y antes del `apply`, con el [procedimiento humano](integracion/para-backend.md#secretos-en-parameter-store-procedimiento-humano) (creación sin salto de línea final, verificación, orden de despliegue, rotación). Terraform no los crea y **no** usa `data "aws_ssm_parameter"` ni ningún recurso que lea o escriba el valor, así que el valor no entra en el estado ni en `terraform.tfvars`.
-- **Entrega:** un `dynamic "setting"` del espacio de nombres `aws:elasticbeanstalk:application:environmentsecrets` (uno por clave; el valor es el ARN del parámetro) en `aws_elastic_beanstalk_environment.this`. El ARN se construye en `local.ssm_secret_arns` con la partición, la región y la cuenta de los data sources `aws_partition`, `aws_region` y `aws_caller_identity`: `arn:<partición>:ssm:<región>:<cuenta>:parameter/sigmetum/<env>/backend/<CLAVE>` (una sola `/` tras `parameter`, la del nombre). El entorno declara `depends_on` de la política IAM.
-- **Permiso:** `aws_iam_role_policy.ssm_secrets` (`sigmetum-ssm-secrets-<env>`) añade al rol compartido `aws-elasticbeanstalk-ec2-role` (creado a mano, no por Terraform) una sentencia `Allow` con `ssm:GetParameters` y `ssm:GetParameter` sobre los tres ARN, sin comodines. No lleva `kms:Decrypt`: con la clave por defecto `aws/ssm` no hace falta **(por confirmar)**; una clave propia (CMK) sería otra decisión. Quien aplica necesita `iam:PutRolePolicy` sobre ese rol.
-- **Validation:** `app_env_vars` rechaza las tres claves en `plan`, con un mensaje que solo cita nombres; si alguien las deja en su `terraform.tfvars`, el `plan` falla.
-- **Plataforma (por confirmar):** el espacio de nombres `environmentsecrets` exige una versión mínima de plataforma no contrastada con la documentación oficial; el humano la comprueba en cada cuenta antes del `apply` (pre-condiciones del [plan](specs/2026-10-31-secretos-beanstalk-plan.md)).
-- **Si falta el parámetro, el permiso o este no se ha propagado:** el backend no arranca (falla cerrado).
+| Clave | Obligatoria en el backend | Notas |
+|---|---|---|
+| `COGNITO_USER_POOL_ID` | No | Id del pool de Cognito (`module.cognito.user_pool_id`); la región va en su prefijo. El backend la exigirá en `validateEnv.js` cuando valide tokens de Cognito (tarea del backend; entonces esta fila pasa a «Sí»). No es un secreto |

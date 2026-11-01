@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-frontend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios).
 
 - Lo verificado contra el código de Terraform está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 31/10/2026 (inicial 30/09/2026). Infraestructura: rama `feature/testing`, commit base `9128987` (cambios sin commitear). Frontend: rama `feature/sigmetum_front_v2` (commit `07938c3`), documento `docs/integracion/para-infra.md`.
+- Fecha de la verificación: 31/10/2026 (inicial 30/09/2026; actualizado 31/10/2026 por el login con Cognito). Infraestructura: rama `feature/testing`, commit base `9128987` (cambios sin commitear). Frontend: rama `feature/sigmetum_front_v2` (commit `07938c3`), documento `docs/integracion/para-infra.md`.
 - Los secretos de `terraform.tfvars` no se han leído; solo se comprobaron los nombres de las claves.
 
 ## 1. Resumen
@@ -20,6 +20,7 @@ Documento para quien mantiene `sigmetum-frontend`. Convención y estructura en [
 | **infra:C10** | El `build_spec` no fijaba Node ni ejecutaba `npm test` | Riesgo de compilar con otra versión o desplegar una build rota | **Resuelto en código** (Node 22 con `nvm` y `npm test` en `preBuild`); **verificado en `dev`** (build #7, 30/10/2026: Node 22, 134 tests en verde y build correcto); `prod` **(por confirmar)**, sin aplicar ni comprobar desde aquí |
 | **infra:C11** | Sin cabeceras de caché ni CSP en Amplify | Sección 6 de `para-infra.md` del frontend | **Resuelto en código** (31/10/2026): caché, HSTS de un día, `nosniff`, Referrer-Policy, Permissions-Policy y CSP solo en Report-Only en `dev` y `prod`. Efecto en AWS **(por confirmar)** hasta el `apply` y un build nuevo. Tarea para el frontend: sección 3 |
 | **infra:C14** (= `frontend:I3`, `backend:F16`) | En el Amplify de `dev`, `/explorar` responde `301` a `/explorar/` y luego `404` aunque las dos `custom_rule` estaban aplicadas | Recargar o abrir un enlace directo a una ruta de la SPA falla | **Resuelto en código** (`source` de la regla SPA en `</regex/>`); **verificado en `dev`** tras el `apply` (30/10/2026): `/explorar`, `/explorar/` y una ruta anidada dan `200` sin `301`; `prod` **(por confirmar)**, sin aplicar ni comprobar desde aquí. Se reabre si `/explorar` sigue dando `301` o `404` |
+| **infra:C17** | Amplify define `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` y el `.env.example` del frontend aún no las lista | `docs-check --strict` falla (aviso entre repositorios) y el build del frontend no las usa hasta que las lea | **Abierto, para el frontend**: añadirlas a su `.env.example` y leerlas (sección 3) |
 
 El detalle de cada uno está en [estado-y-deuda-tecnica.md](../estado-y-deuda-tecnica.md#abiertos).
 
@@ -53,10 +54,24 @@ cache:     node_modules/**/*
 | `VITE_API_PREFIX` | App y rama | `/api/v1` (fijo) |
 | `VITE_S3_URL` | App y rama | `s3_url` del entorno: URL de CloudFront de `storage` (`module.storage.cdn_url`) en `dev` y `prod` |
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` (por defecto vacío) |
+| `VITE_COGNITO_DOMAIN` | **Solo la rama** | URL base del Hosted UI de Cognito (`module.cognito.domain_url`, con `https://`, sin barra final) |
+| `VITE_COGNITO_CLIENT_ID` | **Solo la rama** | Id del cliente público de Cognito (`module.cognito.client_id`; sin secreto) |
 
+**Por qué `VITE_COGNITO_*` van solo en la rama:** en `dev` hay un ciclo de dependencias (`beanstalk` → `cognito` → `amplify` → `beanstalk`); la app de Amplify solo depende del dominio de Cognito (que depende solo del pool) para la CSP, y el id del cliente solo puede salir de la rama. Con una rama por app equivale, porque la variable de rama prevalece sobre la de app **(por confirmar)**. Cambiar `VITE_*` exige una compilación nueva del frontend. Vite las incrusta: son públicas (el id del cliente y el dominio no son secretos).
 **`NODE_ENV` ya no se define (M2).** Efecto esperado: un bundle de unos 768 kB, frente a unos 1058 kB, sin `react-dom.development` ni el aviso de DevTools (comprobado en local con y sin la variable; Vite fija `production` en `vite build`). Estado: resuelto en código y pendiente del `apply` de `dev` y de la verificación; `prod` **(por confirmar)** hasta su primer despliegue. El frontend debe comprobar el rendimiento, que ningún componente dependa de avisos de desarrollo de React y que su CSP Report-Only y sus scripts no cambian. Su `para-infra.md` aún copia `NODE_ENV = var.environment` y debe actualizarse.
 
 **(verificado en rama `feature/testing` de infra).** El nombre completo de cada variable, con "Obligatoria" y el valor por entorno, lo decide el frontend en su `.env.example`; aquí solo se listan las que Amplify define.
+
+### Reglas de reescritura
+
+### Login con Cognito (Hosted UI)
+
+**(verificado en código; efecto en AWS por confirmar hasta el `apply`.)** Infra crea el pool, el dominio del Hosted UI y un cliente público (`generate_secret = false`) con flujo `code`, ámbitos `openid` y `email`, y MFA TOTP obligatorio; el registro está cerrado (solo administradores creados por infra/humano).
+
+- **Direcciones de retorno:** cada origen del frontend (`site_origins`: los dominios propios si los hay; si no, la URL de la rama) más las **rutas fijas** `/auth/callback` (inicio de sesión) y `/` (cierre de sesión), que **crea el frontend**. El frontend las construye con `window.location.origin` más esas rutas: no hay `VITE_*` para las URLs. No hay `localhost`, tampoco en `dev`: para probar en local no hay dirección de retorno registrada.
+- **Requisito PKCE (del frontend, no de infra):** el frontend debe enviar `code_challenge` con método S256 y el `code_verifier` al canjear el código. Terraform no lo impone ni lo verifica: es un requisito «no comprobable desde infra».
+- **Tokens:** acceso e id de 60 minutos; refresco de 8 horas. El frontend guarda y envía el token de acceso al backend, gestiona la expiración y el refresco. El backend solo acepta tokens de Cognito cuando implemente su verificador (ver [para-backend.md](para-backend.md#login-con-cognito-contrato-del-backend)).
+- **`C16`:** el backend no valida `client_id` ni grupos: cualquier usuario del pool es administrador (aceptado por el usuario).
 
 ### Reglas de reescritura
 
@@ -87,7 +102,7 @@ En la tabla, `\|` es solo el escape de la barra vertical de Markdown: el valor r
 
 - **`/assets/*` es el de Vite, no el del bucket.** El patrón afecta al `dist/assets/` con hash que genera `npm run build`; los ficheros del bucket (`assets/…` de la sección "Recursos estáticos") se sirven desde CloudFront, otro origen, y no reciben estas cabeceras. Si `/explorar` no sale con `no-cache` o `/assets/*` no cubre ficheros anidados, habrá que ampliar el patrón **(por confirmar)**.
 - **HSTS de un día** a propósito: el dominio de `prod` es nuevo y la validación del certificado no está comprobada; si algo falla el efecto caduca en un día. Subir `max-age` y valorar `includeSubDomains` es una decisión posterior; `preload` queda descartado. HSTS también se envía desde `*.amplifyapp.com`, con el mismo `max-age`.
-- **CSP solo en Report-Only**: el navegador anota las violaciones en su consola y no bloquea nada; no existe `Content-Security-Policy` bloqueante ni endpoint de informes. Directivas: `default-src 'self'`; `script-src 'self'` (sin `'unsafe-inline'`); `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`; `font-src 'self' https://fonts.gstatic.com`; `img-src 'self'` más `VITE_S3_URL` más `https://*.s3.<región>.amazonaws.com` (galería con URL prefirmada, por confirmar); `connect-src 'self'` más `VITE_BASE_URL`; `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-ancestors 'none'`. Se calcula con `s3_url`, `backend_url` y la región, así que cada entorno obtiene la suya. Sin `data:` ni `blob:` (sin evidencia en el código).
+- **CSP solo en Report-Only**: el navegador anota las violaciones en su consola y no bloquea nada; no existe `Content-Security-Policy` bloqueante ni endpoint de informes. Directivas: `default-src 'self'`; `script-src 'self'` (sin `'unsafe-inline'`); `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`; `font-src 'self' https://fonts.gstatic.com`; `img-src 'self'` más `VITE_S3_URL` más `https://*.s3.<región>.amazonaws.com` (galería con URL prefirmada, por confirmar); `connect-src 'self'` más `VITE_BASE_URL` más el dominio de Cognito (`VITE_COGNITO_DOMAIN`, para el intercambio del código por tokens; sin él, el navegador lo anotaría como violación); `object-src 'none'`; `base-uri 'self'`; `form-action 'self'`; `frame-ancestors 'none'`. Se calcula con `s3_url`, `backend_url` y la región, así que cada entorno obtiene la suya. Sin `data:` ni `blob:` (sin evidencia en el código).
 - **Violación esperada desde el primer día:** el `index.html` del frontend usa `onload="this.rel='stylesheet'"` en dos `<link rel="preload">` de Google Fonts (manejador inline, **verificado** en `../sigmetum-frontend/index.html`). La CSP en Report-Only lo registrará como violación. Es una tarea del frontend (sección 3) antes de endurecer la política.
 - Si el frontend añade un `customHttp.yml` al repositorio, anularía estas cabeceras (por confirmar). Hoy no existe (verificado).
 
@@ -139,7 +154,7 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
 | Compilación con `npm run build` a `dist/` | El `build_spec` ya lo hace | `modules/amplify/main.tf` |
 | `npm test` en `preBuild` | Ya está (infra:C10); debe pasar sin red ni secretos y terminar solo, sin modo watch (el script del frontend es `vitest run`, verificado); infra no ha podido comprobar que no necesite red **(por confirmar)** | `para-infra.md` del frontend, sección 2; `package.json` del frontend |
 | Riesgo hasta subir los assets a `prod` (infra:C7) | `prod` da 403/404 en favicon y logos | Procedimiento en la sección 2; infra avisará cuando se suban |
-| Nombres de las variables `VITE_*` | `VITE_BASE_URL`, `VITE_API_PREFIX`, `VITE_S3_URL`, `VITE_CAROUSEL_IMAGE_KEYS` (contrastado con `../sigmetum-frontend/.env.example`; **avisa `docs-check`/`quality-check` si cambian**) | `.env.example` del frontend |
+| Nombres de las variables `VITE_*` | `VITE_BASE_URL`, `VITE_API_PREFIX`, `VITE_S3_URL`, `VITE_CAROUSEL_IMAGE_KEYS`, y las nuevas `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` (la comparación con `../sigmetum-frontend/.env.example` falla en `--strict` hasta que el frontend las añada; infra:C17; contrastado con `../sigmetum-frontend/.env.example`; **avisa `docs-check`/`quality-check` si cambian**) | `.env.example` del frontend |
 | Que ninguna variable `VITE_*` lleve un secreto | Vite las incrusta en el JavaScript compilado, son públicas | `para-infra.md` del frontend, sección 3 |
 
 ### Tareas para el frontend
@@ -148,6 +163,9 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
 - Preparar la migración a **Node 24**; infra cambiará el `build_spec` en ese momento y avisará.
 - Comprobar antes de fusionar que `npm test` no necesita red ni secretos y que no queda en modo watch.
 - **CSP (infra:C11):** tras el despliegue, abrir la web (en `dev` y, cuando esté, en `prod`) con la consola del navegador y revisar los avisos de `Content-Security-Policy-Report-Only`. La CSP no bloquea nada todavía. Corregir el manejador inline `onload="this.rel='stylesheet'"` de los dos `<link rel="preload">` de fuentes de `index.html` (viola `script-src 'self'`) antes de que infra endurezca la política, y avisar de cualquier origen que use y no esté contemplado (sección 2 "Cabeceras"). `style-src 'unsafe-inline'` (styled-components) solo se podrá endurecer con informes.
+- **Login con Cognito:** implementar el inicio de sesión por el Hosted UI con PKCE S256, la ruta `/auth/callback` (y `/` para el cierre), almacenar y enviar el token de acceso al backend, gestionar su expiración y el refresco, y retirar el login antiguo cuando llegue la fase final (`S18`, tras verificar el TOTP en `prod`).
+- **`.env.example`:** añadir `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` (infra:C17); mientras no estén, `--strict` de `docs-check` de infra falla por el aviso entre repositorios.
+- **`docs/integracion/para-infra.md` del frontend y su CSP:** documentar las dos variables nuevas y que `connect-src` incluye el dominio de Cognito; revisar los avisos de la CSP Report-Only con el login.
 - **`master` del frontend:** sigue siendo Create React App (`react-scripts` 5.0.1, **verificado** el 31/10/2026 en `package.json` de `master`), incompatible con el `build_spec`. Fusionar `feature/testing` en `master` **antes del `apply` de `prod`** (sección 4).
 
 ## 4. Orden de despliegue
@@ -165,6 +183,8 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
    6. **Esperar el certificado** y que el dominio quede activo (consola de Amplify o `aws amplify get-domain-association`, solo lectura); relanzar el build de `master` si hace falta.
    7. **Subir los assets de `prod`** con `--dryrun` y luego sin él (procedimiento en la sección 2). Comprobar la sección 8 de `para-infra.md` con el dominio nuevo y la consola del navegador por avisos de CSP.
 
+8. **Login con Cognito (31/10/2026).** Orden común (detalle en [para-backend.md](para-backend.md#orden-de-despliegue-del-login)): (1) infra aplica `dev` y luego `prod`; (2) backend aceptando ambos tokens; (3) **frontend con compilación nueva** (las `VITE_COGNITO_*` van incrustadas); (4) retirar el login antiguo (backend y después infra), **solo tras verificar el TOTP en `prod` para los dos administradores** y pasado el plazo fijo (`S18`). Vuelta atrás: frontend con el build anterior; infra solo con un cambio revisado y con el frontend ya sin Cognito.
+
 ## 5. Discrepancias (propias de este documento)
 
 | Id | Qué pasa | Dónde | Responsable | Qué hacer |
@@ -176,7 +196,7 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
 
 | Si cambias... | Actualiza en este documento | Avisa |
 |---|---|---|
-| Variables `VITE_*` de `modules/amplify` | Sección 2 | PR: qué variable, valor nuevo por entorno (solo nombres si es secreto) |
+| Variables `VITE_*` de `modules/amplify` (incluidas `VITE_COGNITO_*`), o el pool, el cliente o las rutas de retorno de `modules/cognito` | Sección 2 | PR: qué variable, valor nuevo por entorno (solo nombres si es secreto) |
 | El `build_spec` | Sección 2 | PR: qué cambia en `preBuild`/`build` |
 | Dominios, certificado o cabeceras de Amplify | Sección 2 ("Cabeceras", "Dominios") y sección 4 | PR: dominio nuevo, cuándo estará activo y qué avisos de CSP revisar |
 | El bucket o su acceso | Sección 2 (recursos estáticos) | PR: si cambia `VITE_S3_URL` |

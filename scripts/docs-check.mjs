@@ -455,10 +455,10 @@ const amplifyKeys = (() => {
 }
 
 // ── Avisos frente a los repositorios hermanos (no hacen fallar salvo con --strict) ──────────────
-// Las tres claves secretas viven en su propia sección (Parameter Store), no en la tabla app_env_vars.
+// Las claves que inyecta Terraform (COGNITO_USER_POOL_ID) viven en su propia sección, no en la tabla app_env_vars.
 const docAppKeys = [
   ...namedRows(section(docs[REFERENCE], 'app_env_vars')),
-  ...namedRows(section(docs[REFERENCE], 'Secretos en Parameter Store')),
+  ...namedRows(section(docs[REFERENCE], 'Claves inyectadas por Terraform')),
 ];
 
 {

@@ -17,7 +17,7 @@ module "beanstalk" {
   max_instances      = 1
 
   notification_email = var.notification_email
-  app_env_vars       = var.app_env_vars
+  app_env_vars       = merge(var.app_env_vars, { COGNITO_USER_POOL_ID = module.cognito.user_pool_id })
 }
 
 module "storage" {
@@ -37,6 +37,14 @@ module "backend_ci_iam" {
   access_logs_bucket_name = module.storage.access_logs_bucket_name
 }
 
+module "cognito" {
+  source      = "../../modules/cognito"
+  environment = "dev"
+
+  domain_prefix   = "sigmetum-a-dev"
+  allowed_origins = module.amplify.site_origins
+}
+
 module "amplify" {
   source      = "../../modules/amplify"
   environment = "dev"
@@ -46,4 +54,7 @@ module "amplify" {
   branch              = "feature/testing"
   backend_url         = module.beanstalk.backend_cdn_url
   s3_url              = module.storage.cdn_url
+
+  cognito_domain_url = module.cognito.domain_url
+  cognito_client_id  = module.cognito.client_id
 }
