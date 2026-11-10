@@ -2,6 +2,8 @@
 
 Fecha: 2026-10-31 · Estado: cerrado (v2) · Spec: [design](2026-10-31-cognito-login-design.md)
 
+Nota: Modificado por [corte único](2026-10-31-cognito-corte-unico-design.md): decisiones 1, 5 y 10.
+
 Plan v2 de 8 pasos de código en 2 fases (5 y 3). **Crítico: sí.** Se mantiene lo que ya estaba bien de la v1 (módulo `cognito`, rotura del ciclo de `dev`, `deletion_protection` condicional, etiqueta `identity`, reversión de Parameter Store) y se incorporan las decisiones del usuario y los puntos de la segunda opinión. Los atributos del proveedor `aws ~> 5.0` (lock 5.100.0) y la disponibilidad de Cognito en `eu-west-3` están **por confirmar**; `terraform validate` solo cubre que los nombres de atributo existan. Los roles no ejecutan `plan` ni `apply`.
 
 ## Decisiones de diseño (el developer no decide nada de esto)

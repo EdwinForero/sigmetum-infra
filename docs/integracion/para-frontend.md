@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-frontend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios).
 
 - Lo verificado contra el código de Terraform está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 31/10/2026 (inicial 30/09/2026; actualizado 31/10/2026 por el login con Cognito). Infraestructura: rama `feature/testing`, commit base `9128987` (cambios sin commitear). Frontend: rama `feature/sigmetum_front_v2` (commit `07938c3`), documento `docs/integracion/para-infra.md`.
+- Fecha de la verificación: 31/10/2026 (inicial 30/09/2026; actualizado 03/11/2026 por el corte único a Cognito; antes, 31/10/2026 por el login con Cognito). Infraestructura: rama `feature/testing`, commit base `164830b` (cambios sin commitear). Frontend: rama `feature/sigmetum_front_v2` (commit `07938c3`), documento `docs/integracion/para-infra.md`.
 - Los secretos de `terraform.tfvars` no se han leído; solo se comprobaron los nombres de las claves.
 
 ## 1. Resumen
@@ -70,7 +70,7 @@ cache:     node_modules/**/*
 
 - **Direcciones de retorno:** cada origen del frontend (`site_origins`: los dominios propios si los hay; si no, la URL de la rama) más las **rutas fijas** `/auth/callback` (inicio de sesión) y `/` (cierre de sesión), que **crea el frontend**. El frontend las construye con `window.location.origin` más esas rutas: no hay `VITE_*` para las URLs. No hay `localhost`, tampoco en `dev`: para probar en local no hay dirección de retorno registrada.
 - **Requisito PKCE (del frontend, no de infra):** el frontend debe enviar `code_challenge` con método S256 y el `code_verifier` al canjear el código. Terraform no lo impone ni lo verifica: es un requisito «no comprobable desde infra».
-- **Tokens:** acceso e id de 60 minutos; refresco de 8 horas. El frontend guarda y envía el token de acceso al backend, gestiona la expiración y el refresco. El backend solo acepta tokens de Cognito cuando implemente su verificador (ver [para-backend.md](para-backend.md#login-con-cognito-contrato-del-backend)).
+- **Tokens:** acceso e id de 60 minutos; refresco de 8 horas. El frontend guarda y envía el token de acceso al backend, gestiona la expiración y el refresco. Tras el corte único, el backend solo acepta tokens de Cognito (sin convivencia con el login antiguo) cuando se despliegue su verificador, **por confirmar** porque hoy no existe (ver [para-backend.md](para-backend.md#login-con-cognito-contrato-del-backend)).
 - **`C16`:** el backend no valida `client_id` ni grupos: cualquier usuario del pool es administrador (aceptado por el usuario).
 
 ### Reglas de reescritura
@@ -163,7 +163,7 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
 - Preparar la migración a **Node 24**; infra cambiará el `build_spec` en ese momento y avisará.
 - Comprobar antes de fusionar que `npm test` no necesita red ni secretos y que no queda en modo watch.
 - **CSP (infra:C11):** tras el despliegue, abrir la web (en `dev` y, cuando esté, en `prod`) con la consola del navegador y revisar los avisos de `Content-Security-Policy-Report-Only`. La CSP no bloquea nada todavía. Corregir el manejador inline `onload="this.rel='stylesheet'"` de los dos `<link rel="preload">` de fuentes de `index.html` (viola `script-src 'self'`) antes de que infra endurezca la política, y avisar de cualquier origen que use y no esté contemplado (sección 2 "Cabeceras"). `style-src 'unsafe-inline'` (styled-components) solo se podrá endurecer con informes.
-- **Login con Cognito:** implementar el inicio de sesión por el Hosted UI con PKCE S256, la ruta `/auth/callback` (y `/` para el cierre), almacenar y enviar el token de acceso al backend, gestionar su expiración y el refresco, y retirar el login antiguo cuando llegue la fase final (`S18`, tras verificar el TOTP en `prod`).
+- **Login con Cognito:** implementar el inicio de sesión por el Hosted UI con PKCE S256, la ruta `/auth/callback` (y `/` para el cierre), almacenar y enviar el token de acceso al backend, gestionar su expiración y el refresco, como reemplazo del login antiguo, sin convivencia de tokens: el login antiguo deja de funcionar al desplegar el backend solo-Cognito, así que el frontend se despliega después del backend.
 - **`.env.example`:** añadir `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` (infra:C17); mientras no estén, `--strict` de `docs-check` de infra falla por el aviso entre repositorios.
 - **`docs/integracion/para-infra.md` del frontend y su CSP:** documentar las dos variables nuevas y que `connect-src` incluye el dominio de Cognito; revisar los avisos de la CSP Report-Only con el login.
 - **`master` del frontend:** sigue siendo Create React App (`react-scripts` 5.0.1, **verificado** el 31/10/2026 en `package.json` de `master`), incompatible con el `build_spec`. Fusionar `feature/testing` en `master` **antes del `apply` de `prod`** (sección 4).
@@ -183,7 +183,7 @@ En `prod`, el backend tiene un listener HTTPS con `ELBSecurityPolicy-TLS13-1-2-2
    6. **Esperar el certificado** y que el dominio quede activo (consola de Amplify o `aws amplify get-domain-association`, solo lectura); relanzar el build de `master` si hace falta.
    7. **Subir los assets de `prod`** con `--dryrun` y luego sin él (procedimiento en la sección 2). Comprobar la sección 8 de `para-infra.md` con el dominio nuevo y la consola del navegador por avisos de CSP.
 
-8. **Login con Cognito (31/10/2026).** Orden común (detalle en [para-backend.md](para-backend.md#orden-de-despliegue-del-login)): (1) infra aplica `dev` y luego `prod`; (2) backend aceptando ambos tokens; (3) **frontend con compilación nueva** (las `VITE_COGNITO_*` van incrustadas); (4) retirar el login antiguo (backend y después infra), **solo tras verificar el TOTP en `prod` para los dos administradores** y pasado el plazo fijo (`S18`). Vuelta atrás: frontend con el build anterior; infra solo con un cambio revisado y con el frontend ya sin Cognito.
+8. **Login con Cognito (31/10/2026).** Orden común (detalle en [para-backend.md](para-backend.md#orden-de-despliegue-del-login)): corte único en `dev`: (1) infra sin las claves del login antiguo y backend solo-Cognito, desplegados seguidos (caída de unos minutos en `dev`); (2) después, creación de los dos administradores y verificación del TOTP; (3) **después, el frontend con compilación nueva** (las `VITE_COGNITO_*` van incrustadas). El frontend actual (login antiguo) deja de funcionar al desplegar el backend, hasta que se despliegue el login nuevo. `prod` no se toca hasta verificar el TOTP con los dos administradores (`S18-prod`). Sin vuelta atrás en `dev` (se arregla hacia delante); la de `prod` se decide en su corte.
 
 ## 5. Discrepancias (propias de este documento)
 

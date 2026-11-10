@@ -2,6 +2,8 @@
 
 Fecha: 2026-10-31 · Estado: cerrado
 
+Nota: Modificado por [corte único](2026-10-31-cognito-corte-unico-design.md): decisiones 1, 5 y 10.
+
 ## Objetivo
 
 Hoy el administrador entra con un usuario y un hash bcrypt (`ADMIN_USERNAME`, `ADMIN_PASSWORD`) y el backend firma un JWT propio con `JWT_SECRET` (`POST /log`, `GET /auth`, middleware `tokenAuth`); el frontend guarda ese token en `localStorage` y lo envía como `Authorization: Bearer`. Se quiere sustituir ese login por Amazon Cognito. Esta spec cubre solo la parte de infraestructura: que cada entorno (`dev` y `prod`, en cuentas distintas) tenga su propio servicio de identidad, que se publiquen los identificadores no secretos que backend y frontend necesitan, y que los contratos de integración fijen el orden de despliegue y las tareas de los otros dos repositorios.

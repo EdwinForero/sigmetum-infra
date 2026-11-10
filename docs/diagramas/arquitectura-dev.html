@@ -205,7 +205,7 @@
 </svg>
 </div>
 <p class="note"><strong>Login (Hosted UI, código + PKCE):</strong> el navegador sale a Cognito, vuelve a <code>/auth/callback</code> con un código y lo canjea en <code>/oauth2/token</code>. Envía el token de acceso (RS256) al backend como <code>Bearer</code>, y el backend lo verifica con las claves públicas JWKS del pool (<code>iss</code>, <code>token_use=access</code>, <code>exp</code>).</p>
-<p class="note"><strong>Configuración:</strong> el backend recibe <code>COGNITO_USER_POOL_ID</code> por variable de entorno; Amplify recibe <code>VITE_COGNITO_DOMAIN</code> y <code>VITE_COGNITO_CLIENT_ID</code> solo en la rama. <strong>Transición:</strong> el login antiguo (<code>POST /log</code> con <code>JWT_SECRET</code>) sigue activo y se retira al final.</p>
+<p class="note"><strong>Configuración:</strong> el backend recibe <code>COGNITO_USER_POOL_ID</code> por variable de entorno; Amplify recibe <code>VITE_COGNITO_DOMAIN</code> y <code>VITE_COGNITO_CLIENT_ID</code> solo en la rama. <strong>Login:</strong> solo por Cognito en dev; el login antiguo (<code>POST /log</code>) se retira en el corte del backend. Prod lo conserva hasta su propio corte.</p>
 <p class="note"><strong>Dev:</strong> el pool no tiene protección contra borrado y la URL de retorno es la de la rama de Amplify.</p>
 </body>
 </html>

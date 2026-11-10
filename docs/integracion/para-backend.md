@@ -3,7 +3,7 @@
 Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [mantenimiento.md](../guias/mantenimiento.md#3-contrato-con-el-frontend-y-el-backend-convención-entre-repositorios) (compartida por los tres repositorios). El backend no tiene un documento `para-infra.md` equivalente: su contrato con esta infraestructura es `config/validateEnv.js`, `config/trustProxy.js`, `app.js` y `aws/awsS3connect.js`, que se citan aquí.
 
 - Lo verificado contra el código de Terraform y del backend está marcado como **(verificado)**. Lo que depende de la cuenta real de AWS, como **(por confirmar)**.
-- Fecha de la verificación: 30/09/2026 (actualizado 31/10/2026, login con Cognito y `COGNITO_USER_POOL_ID`, secretos de vuelta a `app_env_vars` (Parameter Store revertido), `TRUST_PROXY_HOPS`, restricción del origen de `dev` a CloudFront y `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `cee5e23` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
+- Fecha de la verificación: 30/09/2026 (actualizado 03/11/2026, corte único a Cognito: infra deja de exigir las cuatro claves del login antiguo; antes, 31/10/2026, login con Cognito y `COGNITO_USER_POOL_ID`, secretos de vuelta a `app_env_vars` (Parameter Store revertido), `TRUST_PROXY_HOPS`, restricción del origen de `dev` a CloudFront y `ALLOWED_ORIGIN` de prod con dos orígenes). Infraestructura: rama `feature/testing`, commit base `164830b` (cambios sin commitear). Backend: rama `feature/sigmetum_v2`, commit `a2dadb9`.
 
 ## 1. Resumen
 
@@ -16,20 +16,17 @@ Documento para quien mantiene `sigmetum-backend`. Convención y estructura en [m
 | **infra:S17** | El origen de Beanstalk de `dev` admitía HTTP directo desde cualquier origen (verificado el 31/10/2026 con `curl` y `describe-security-groups`) | Una petición directa al CNAME de Beanstalk salta CloudFront: con el valor dos, `X-Forwarded-For` es falsificable y los límites de login y `/send-email` se esquivan | **Resuelto en código para `dev`, pendiente del `apply` y de la puerta de decisión** (si `curl` directo sigue dando `200`, se revierte y se anota la deuda). Detalle en la sección 4 |
 | **infra:S15** (dependencia del `apply`) | El backend ya trata `AccessDenied` como "no existe" en lecturas (`GET /list-terms`, `GET /get-data/:path(*)`), pero no en las rutas que escriben (`upload-term`, `delete-term`), a propósito | Tras acotar `s3:ListBucket` por `Prefix` (infra:S7), una clave inexistente da `AccessDenied` y no `NoSuchKey` **(por confirmar el estado exacto)**. En `dev`, `data/terms/noLatinTerms.json` no existe (verificado el 31/10/2026): `/list-terms` da `200` con lista vacía, pero la primera alta de término fallaría con 500 | **Abierto, para quien despliega**: subir `data/terms/noLatinTerms.json` con `[]` a dev y prod (comando en la sección 5); el backend no cambia |
 | **infra:C16** | El backend no valida `client_id` ni grupos de los tokens de Cognito | Cualquier usuario del pool es administrador | **Aceptado por el usuario**, válido solo con registro cerrado y un pool de solo administradores; vía de salida en la sección 2 |
-| **infra:S6** | `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` vuelven a ser propiedades de entorno de Beanstalk | Pueden verse en la salida de `terraform plan` y en el estado | **Reabierto**; detalle en la sección 2 |
+| **infra:S6** | Los secretos de la aplicación viajan como propiedades de entorno de Beanstalk | Pueden verse en la salida de `terraform plan` y en el estado | **Casi cerrado en dev** (solo queda `EMAIL_PASSWORD`); **abierto en prod** hasta su corte propio (`S18-prod`); detalle en la sección 2 |
+| **infra:S18** | Retirada del login antiguo, adelantada por el corte único (decisión del 31/10/2026) | El backend actual exige las cuatro claves del login antiguo: con infra sin ellas no arranca | **Dev hecho en código; prod abierto.** Dev pendiente del backend solo-Cognito (**por confirmar**, hoy no existe) y del `apply` del humano; prod, hasta verificar el TOTP con los dos administradores. Orden en la sección 2 |
 
 ## 2. Contrato de entorno: `app_env_vars` frente a `validateEnv.js`
 
 El backend exige estas variables al arrancar (`config/validateEnv.js`, verificado). Solo se listan **nombres**, nunca valores. Además de existir, algunas tienen reglas de valor (validación estricta):
 
-La variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las nueve variables del backend de la tabla más `COGNITO_USER_POOL_ID` (que inyecta el entorno, no el humano), acepta claves extra y no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. **Los tres secretos vuelven a `app_env_vars`** (se revierte la migración a Parameter Store del commit `0885804`, ver el aviso de la sección siguiente).
+La variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`: exige por nombre las cinco variables del backend de la tabla (`EMAIL`, `EMAIL_PASSWORD`, `AWS_REGION`, `AWS_BUCKET_NAME` y `ALLOWED_ORIGIN`) más `COGNITO_USER_POOL_ID` (que inyecta el entorno, no el humano), acepta claves extra y no comprueba el contenido, que sigue siendo cosa de `validateEnv.js`. **Corte único a Cognito (`S18` en dev):** las cuatro claves del login antiguo (`JWT_SECRET`, `JWT_EXPIRATION`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`) ya no se exigen ni figuran en las plantillas. El `validateEnv.js` actual del backend **todavía las exige**: hasta que el backend solo-Cognito se despliegue, el backend actual no arranca sin ellas (ver el orden del corte). En prod siguen siendo válidas como claves extra.
 
 | Variable | Exigida por el backend | La define `app_env_vars` hoy | Es secreto |
 |---|---|---|---|
-| `JWT_SECRET` | Sí | Sí (`terraform.tfvars`) | Sí |
-| `JWT_EXPIRATION` | Sí | Sí | No |
-| `ADMIN_USERNAME` | Sí | Sí | No |
-| `ADMIN_PASSWORD` | Sí | Sí (`terraform.tfvars`) | Sí (hash bcrypt) |
 | `EMAIL` | Sí | Sí | No |
 | `EMAIL_PASSWORD` | Sí | Sí (`terraform.tfvars`) | Sí |
 | `AWS_REGION` | Sí | Sí (`eu-west-3`) | No |
@@ -39,41 +36,39 @@ La variable `app_env_vars` de `modules/beanstalk` se valida en `terraform plan`:
 | `TRUST_PROXY_HOPS` | No (opcional; 1 si no se define) | Sí (`"2"` en los `.example`; el de `prod` por confirmar, `backend:I7`) | No |
 | `COGNITO_USER_POOL_ID` | **No, todavía** (el backend la exigirá cuando valide tokens de Cognito; tarea del backend) | La inyecta Terraform desde el módulo `cognito` en `main.tf` de cada entorno; **no** va en `terraform.tfvars` | No |
 
-**Efecto operativo de las claves nuevas o devueltas:** cambian las propiedades de entorno de Beanstalk (settings de `aws:elasticbeanstalk:application:environment`), lo que reconfigura el entorno y **reinicia el backend** (en `prod`, con despliegue gradual **(por confirmar)**). El `apply` lo ejecuta el humano.
+**Efecto operativo de cambiar las claves:** cambian las propiedades de entorno de Beanstalk (settings de `aws:elasticbeanstalk:application:environment`), lo que reconfigura el entorno y **reinicia el backend** (en `prod`, con despliegue gradual **(por confirmar)**). El `apply` lo ejecuta el humano.
 
 **Reglas de valor (verificado en `config/validateEnv.js` y `config/trustProxy.js`; solo reglas, sin valores):**
 
-- `JWT_SECRET`: al menos 32 caracteres.
-- `ADMIN_PASSWORD`: un hash bcrypt completo.
-- `JWT_EXPIRATION`: duración con unidad y mayor que cero (un número sin unidad es inválido).
 - `TRUST_PROXY_HOPS`: entero de 1 a 5; el 0 solo con `NODE_ENV` `local` o `test`.
 - Con `NODE_ENV` distinto de `local` y `test`, un valor inválido **impide el arranque**; con `local` o `test` solo avisa. **No definir `NODE_ENV` como `local` ni `test` en Beanstalk** (estaría relajando la validación).
 - Si los valores reales de `terraform.tfvars` cumplen estas reglas: **(por confirmar)**; no se leen. Un valor incumplidor haría que el backend no arranque tras el despliegue.
 
-Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las claves que pone el humano (no `COGNITO_USER_POOL_ID`). Los `terraform.tfvars` reales (fuera de git) deben tenerlas aplicadas por quien despliega; si el humano ya había quitado las tres claves de secretos de su `terraform.tfvars` (migración revertida), `plan` falla por la `validation` y hay que reponerlas (falla cerrado, es lo esperado).
+Las plantillas `environments/*/terraform.tfvars.example` incluyen todas las claves que pone el humano (no `COGNITO_USER_POOL_ID`). Los `terraform.tfvars` reales (fuera de git) deben tenerlas aplicadas por quien despliega. Un `terraform.tfvars` de prod que aún tenga las cuatro claves del login antiguo **sigue siendo válido** (claves extra permitidas): prod las conserva hasta su corte propio (`S18-prod`). El de dev ya no las tiene. Si falta una de las seis claves exigidas, `plan` falla (falla cerrado, es lo esperado).
 
 **Cómo llegan:** todas como propiedades de entorno del entorno de Beanstalk (`dynamic "setting"` sobre `app_env_vars`, namespace `aws:elasticbeanstalk:application:environment`, verificado en `modules/beanstalk/main.tf`). No hay Parameter Store, `environmentsecrets` ni política IAM `sigmetum-ssm-secrets-<env>` en el código.
 
-**Aviso: S6 reabierto.** Al revertir `0885804`, `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` **vuelven a viajar como propiedades de entorno de Beanstalk**. `for_each = nonsensitive(var.app_env_vars)` (`modules/beanstalk/main.tf`) quita la marca de sensible: **pueden verse en la salida de `terraform plan` y en el estado**. No se asume que el proveedor oculte `setting.value`. Mitigaciones existentes: estado cifrado (`aa4b508`) y la regla de no pegar la salida del `plan` (ni en chats ni en PR). Seguimiento: [S6 y S2](../estado-y-deuda-tecnica.md#abiertos).
+**Aviso: S6 casi cerrado en dev, abierto en prod.** En dev el único secreto de `app_env_vars` es `EMAIL_PASSWORD`, que **viaja como propiedad de entorno de Beanstalk**. `for_each = nonsensitive(var.app_env_vars)` (`modules/beanstalk/main.tf`) quita la marca de sensible: **puede verse en la salida de `terraform plan` y en el estado**. No se asume que el proveedor oculte `setting.value`. En prod, mientras conserve las claves del login antiguo, también viajan `JWT_SECRET` y el hash `ADMIN_PASSWORD`. Mitigaciones existentes: estado cifrado (`aa4b508`) y la regla de no pegar la salida del `plan` (ni en chats ni en PR). Seguimiento: [S6 y S2](../estado-y-deuda-tecnica.md#abiertos).
 
 ### Login con Cognito: contrato del backend
 
-Infra crea un pool de usuarios de Cognito por entorno (módulo `cognito`, [referencia](../referencia-modulos.md#módulo-cognito)) y entrega al backend **solo** `COGNITO_USER_POOL_ID`; la región va en el prefijo del id y `AWS_REGION` ya existe. **(verificado en código; efecto en AWS por confirmar hasta el `apply`.)** Hoy `middleware/tokenAuthentication.js` solo acepta HS256 con `JWT_SECRET` y no usa ninguna librería de JWKS **(verificado el 31/10/2026 en la spec)**. Lo que debe hacer el backend al verificar un token de Cognito:
+Infra crea un pool de usuarios de Cognito por entorno (módulo `cognito`, [referencia](../referencia-modulos.md#módulo-cognito)) y entrega al backend **solo** `COGNITO_USER_POOL_ID`; la región va en el prefijo del id y `AWS_REGION` ya existe. **(verificado en código; efecto en AWS por confirmar hasta el `apply`.)** Hoy `middleware/tokenAuthentication.js` solo acepta HS256 con `JWT_SECRET` y no usa ninguna librería de JWKS **(verificado el 31/10/2026 en la spec)**; el backend solo-Cognito aún no existe en ese repositorio **(por confirmar)**. Lo que debe hacer el backend al verificar un token de Cognito:
 
 1. `iss` exacto: `https://cognito-idp.<región>.amazonaws.com/<COGNITO_USER_POOL_ID>`.
 2. `token_use = access`.
 3. `exp` vigente.
 4. **RS256 fijo en `algorithms`; nunca el `alg` del cabecero.**
 5. Firma por JWKS con caché y rotación de claves, y límite de peticiones al endpoint de JWKS.
-6. Convivencia durante la transición: probar primero el verificador antiguo (HS256 con `JWT_SECRET`) y, si falla, el de Cognito (RS256). **No se enruta por el `alg` del cabecero.**
+6. Verificador Cognito único: **sin convivencia** con el verificador antiguo (corte único en dev). Desaparecen el login antiguo (`POST /log`) y el verificador HS256. **No se enruta por el `alg` del cabecero.**
 
 **`C16` (aceptado por el usuario): el backend no valida `client_id` ni grupos, así que cualquier usuario del pool es administrador.** Es válido solo con el registro cerrado (`allow_admin_create_user_only = true`, ya en el módulo) y un pool con solo administradores. Vía de salida: validar `client_id` y/o un grupo `admin` en el backend; exige `COGNITO_CLIENT_ID` o grupos en el backend y, en `dev`, separar el cliente en otro `apply` (ciclo de dependencias); es un cambio de spec. Ver [C16](../estado-y-deuda-tecnica.md#abiertos).
 
 **Tareas del backend (este repositorio no edita el suyo):**
 
-- Añadir `COGNITO_USER_POOL_ID` a `config/validateEnv.js` (hasta entonces, la fila de arriba dice «No»; al exigirla pasa a «Sí» y `docs-check` lo avisará).
-- Implementar el verificador de la lista anterior, en convivencia con el actual.
-- Al final de la transición (`S18`): retirar `POST /log`, `JWT_SECRET` y `ADMIN_*` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`); infra quitará después las tres claves de secretos de `app_env_vars`.
+- Retirar `POST /log`, `JWT_SECRET`, `JWT_EXPIRATION`, `ADMIN_USERNAME` y `ADMIN_PASSWORD` de `config/validateEnv.js`, el verificador HS256 de `middleware/tokenAuthentication.js` y la ruta de login de `routes/auth.js`.
+- Implementar el verificador de Cognito de la lista anterior como único verificador.
+- Añadir `COGNITO_USER_POOL_ID` a `required` de `config/validateEnv.js` (hasta entonces, la fila de arriba dice «No»; al exigirla pasa a «Sí» y `docs-check` lo avisará).
+- Infra ya no exige ni documenta las cuatro claves en dev; en prod las conserva hasta `S18-prod` (después las quitará del `tfvars` real).
 - `ALLOWED_ORIGIN` debe coincidir con los orígenes de `cognito_callback_urls` (sección 7).
 
 ### Procedimiento humano de alta de administrador
@@ -88,12 +83,19 @@ Solo nombres y marcadores: **nunca** una contraseña, un código TOTP ni un valo
 
 ### Orden de despliegue del login
 
-1. **Infra:** `apply` en `dev` y después en `prod` (el humano). Comprobar: pool, dominio y cliente creados, Beanstalk en `Green` con `COGNITO_USER_POOL_ID`, Hosted UI cargando y los administradores creados con el procedimiento anterior. En `dev`, `ALLOWED_ORIGIN` se rellena tras el primer `apply` (orden humano ya existente).
-2. **Backend:** aceptando ambos tokens (el antiguo y el de Cognito), en `dev` y luego en `prod`.
-3. **Frontend:** compilación nueva con `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` (ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue)).
-4. **Retirar el login antiguo** (primero backend, después infra). **NO se hace hasta verificar en `prod` que el TOTP funciona:** inicio de sesión por Hosted UI con MFA y comprobación del segundo administrador. Además, pasado el plazo fijo (`S18`).
+Orden del corte único estricto en `dev` (decisión del usuario, 31/10/2026): sin convivencia de tokens y sin vuelta atrás; si algo falla, se arregla hacia delante.
 
-**Vuelta atrás:** frontend con el build anterior y backend con la versión anterior; infra solo con un cambio revisado y con el frontend ya sin Cognito (en `prod`, `deletion_protection` lo impide por `apply` normal).
+1. El backend solo-Cognito debe existir y estar listo para desplegar (**por confirmar**: hoy no existe en el repositorio del backend).
+2. `apply` de infra en `dev` sin las cuatro claves (el humano). Si el backend desplegado aún las exige, no arranca. Este `apply` debe ser el que crea el pool, para que `COGNITO_USER_POOL_ID` esté disponible para el backend nuevo.
+3. Despliegue inmediato del backend solo-Cognito (caída de unos minutos aceptada).
+4. Después, crear los dos administradores con el procedimiento anterior y verificar el TOTP.
+5. Después, el frontend: compilación nueva con `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_CLIENT_ID` (ver [para-frontend.md](para-frontend.md#4-orden-de-despliegue)).
+
+**Entre pasos, solo lectura:** entorno de Beanstalk en `Green` (`describe-environments`, `describe-events`), `/healthcheck` en `200`, Hosted UI cargando, y estado `CONFIRMED` con MFA de ambos administradores (`admin-get-user`).
+
+**Riesgo de `AllAtOnce` en dev (`modules/beanstalk/main.tf`):** el `apply` reinicia el backend con la versión vieja, que exige las cuatro claves y no arranca; Beanstalk podría marcar la actualización como fallida y revertir, o el `apply` tardar. Mitigación: subir antes a S3 la versión del backend nuevo, desplegarla justo tras el `apply` y comprobar con `describe-events` si hubo rollback.
+
+**Vuelta atrás en dev:** ninguna, se arregla hacia delante. **Prod:** no se toca hasta verificar el TOTP en prod con los dos administradores; su vuelta atrás está sin decidir y se define al preparar su corte (`S18-prod`). Retirar después las claves del `tfvars` real de prod.
 
 **Si el entorno no se recupera tras el `apply`:**
 
@@ -281,7 +283,7 @@ El bucket de staging lo deriva el workflow del account ID al correr (`elasticbea
 |---|---|---|
 | Una clave de `app_env_vars` | Sección 2 | PR: qué clave, en qué entorno (solo nombres) |
 | El pool, el cliente o el dominio de Cognito (`modules/cognito`), o `COGNITO_USER_POOL_ID` | Sección 2 (contrato de login, alta de administrador, orden) y sección 7 (coherencia con `ALLOWED_ORIGIN`) | PR: qué cambia y si afecta a los usuarios o a `iss`; el backend valida el id del pool |
-| Uno de los tres secretos (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`) | Sección 2 (aviso S6: visibles en `plan` y estado) | PR: qué clave y en qué entorno (solo nombres) |
+| `EMAIL_PASSWORD` (único secreto de dev) o, en prod, uno de los secretos que conserva | Sección 2 (aviso S6: visibles en `plan` y estado) | PR: qué clave y en qué entorno (solo nombres) |
 | `HealthCheckPath` u otro ajuste de Beanstalk | Sección 3 | PR |
 | El ALB, el certificado o el DNS | Sección 4 | PR: nuevo dominio o URL |
 | La política IAM de `modules/storage` | Sección 5 (y B2 de la sección 8) | PR: qué acciones o prefijos cambian |

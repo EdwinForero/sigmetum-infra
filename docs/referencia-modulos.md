@@ -42,7 +42,7 @@ Aplicación y entorno de Elastic Beanstalk (Node.js) para el backend. Los roles 
 | `ssh_key_name` | string | `""` | Par de claves EC2; vacío desactiva SSH |
 | `ssh_allowed_cidrs` | list(string) | `[]` | CIDR con acceso SSH; solo aplica si hay `ssh_key_name` |
 | `notification_email` | string | — | Correo de las notificaciones SNS del entorno |
-| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible), **secretos incluidos**: tabla en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` las nueve claves del backend más `COGNITO_USER_POOL_ID` (por nombre, no por valor; esta última la inyecta el entorno, ver [Claves inyectadas por Terraform](#claves-inyectadas-por-terraform)) y acepta claves extra. Aviso S6: `JWT_SECRET`, `EMAIL_PASSWORD` y el hash `ADMIN_PASSWORD` viajan como propiedades de entorno y, con `nonsensitive`, pueden verse en la salida de `terraform plan` y en el estado |
+| `app_env_vars` | map(string) | `{}` | Variables de entorno del proceso Node.js (sensible), **secretos incluidos**: tabla en [app_env_vars](#app_env_vars). Una `validation` exige en `plan` seis claves: las cinco obligatorias de la tabla más `COGNITO_USER_POOL_ID` (por nombre, no por valor; esta última la inyecta el entorno, ver [Claves inyectadas por Terraform](#claves-inyectadas-por-terraform)), y acepta claves extra. Aviso S6: `EMAIL_PASSWORD` viaja como propiedad de entorno y, con `nonsensitive`, puede verse en la salida de `terraform plan` y en el estado |
 
 ### Outputs
 
@@ -290,17 +290,13 @@ Crea el rol IAM que GitHub Actions asume via OIDC para desplegar el backend en B
 
 ## app_env_vars
 
-Claves del mapa `app_env_vars` de los dos entornos (las que pone el humano en `terraform.tfvars`, ignorado por git). El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. **Incluye los tres secretos** (`JWT_SECRET`, `EMAIL_PASSWORD`, `ADMIN_PASSWORD`), que vuelven aquí al revertir la migración a Parameter Store: **aviso S6**, viajan como propiedades de entorno de Beanstalk, `for_each = nonsensitive(var.app_env_vars)` quita la marca de sensible y pueden verse en la salida de `terraform plan` y en el estado (no pegues esa salida). La variable de `modules/beanstalk` lleva una `validation` que comprueba en `plan` las nueve claves obligatorias de la tabla más `COGNITO_USER_POOL_ID` (solo los nombres, nunca los valores); `PORT` y `TRUST_PROXY_HOPS` son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza.
+Claves del mapa `app_env_vars` de los dos entornos (las que pone el humano en `terraform.tfvars`, ignorado por git). El backend las valida al arrancar en `config/validateEnv.js` del repositorio `sigmetum-backend`; si falta una obligatoria, no arranca. **En dev, el único secreto de `app_env_vars` es `EMAIL_PASSWORD`** (corte único a Cognito, `S18` en dev; [spec](specs/2026-10-31-cognito-corte-unico-design.md)): **aviso S6**, viaja como propiedad de entorno de Beanstalk, `for_each = nonsensitive(var.app_env_vars)` quita la marca de sensible y puede verse en la salida de `terraform plan` y en el estado (no pegues esa salida). La variable de `modules/beanstalk` lleva una `validation` que comprueba en `plan` seis claves: las cinco obligatorias de la tabla más `COGNITO_USER_POOL_ID` (solo los nombres, nunca los valores); `PORT` y `TRUST_PROXY_HOPS` son opcionales en el backend, las claves extra son válidas y un valor vacío no se rechaza. **Prod:** las cuatro claves del login antiguo (`JWT_SECRET`, `JWT_EXPIRATION`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`) ya no están en las plantillas ni en la tabla, pero un `terraform.tfvars` de prod que aún las tenga sigue siendo válido, porque la `validation` acepta claves extra; prod las conserva hasta su corte propio (`S18-prod`, tras verificar el TOTP con los dos administradores). No se listan en la tabla porque obligarían a las plantillas a definirlas. Hasta que el backend deje de exigirlas, `quality-check` y `docs-check` darán avisos de coherencia (no fallos).
 
 | Clave | Obligatoria en el backend | Notas |
 |---|---|---|
 | `PORT` | No | Puerto del proceso; el proxy de Beanstalk reenvía el puerto 80 al 8000 |
 | `AWS_REGION` | Sí | Región del bucket; la del proveedor de Terraform |
 | `AWS_BUCKET_NAME` | Sí | Debe coincidir con `bucket_name` |
-| `JWT_SECRET` | Sí | **Secreto (S6).** Al menos 32 caracteres; distinto en cada entorno. Se retira al final de la transición a Cognito (`S18`) |
-| `JWT_EXPIRATION` | Sí | Duración del token |
-| `ADMIN_USERNAME` | Sí | Usuario administrador |
-| `ADMIN_PASSWORD` | Sí | **Secreto (S6).** Hash bcrypt completo (60 caracteres, sin salto de línea final), nunca el texto en claro. Se retira en `S18` |
 | `ALLOWED_ORIGIN` | Sí | Origen exacto del frontend del entorno, para CORS (ver [hallazgo C5](estado-y-deuda-tecnica.md#resueltos)). Admite una lista separada por comas; en `prod`, `https://<dominio>,https://www.<dominio>` (ver [para-backend.md](integracion/para-backend.md#7-allowed_origin-por-entorno)). Debe coincidir con los orígenes de `cognito_callback_urls` |
 | `EMAIL` | Sí | Cuenta de correo del backend |
 | `EMAIL_PASSWORD` | Sí | **Secreto (S6).** Contraseña de aplicación, no la de la cuenta |

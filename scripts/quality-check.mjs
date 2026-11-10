@@ -357,6 +357,16 @@ const outputs = tfFiles
     }
   }
 
+  // Claves retiradas en el corte único a Cognito (S18): no deben volver a las plantillas, ni siquiera comentadas.
+  const RETIRED_KEYS = ['JWT_SECRET', 'JWT_EXPIRATION', 'ADMIN_USERNAME', 'ADMIN_PASSWORD'];
+  const retiredPattern = new RegExp('^\\s*#?\\s*(' + RETIRED_KEYS.join('|') + ')\\s*=', 'm');
+  for (const env of environments) {
+    const file = `environments/${env}/terraform.tfvars.example`;
+    if (!existsSync(join(ROOT, file))) continue;
+    const found = read(file).match(retiredPattern);
+    if (found) problems.push(`${file}: contiene la clave retirada ${found[1]} (corte único a Cognito, S18); no debe volver a las plantillas`);
+  }
+
   const listed = run('git', ['ls-files']);
   if (listed.status !== 0) notes.push('No se pudo ejecutar git ls-files: no se comprobaron los archivos versionados.');
   else {

@@ -81,15 +81,15 @@ variable "notification_email" {
 }
 
 variable "app_env_vars" {
-  description = "Application environment variables passed to the Node.js process, secrets included (JWT_SECRET, EMAIL_PASSWORD and ADMIN_PASSWORD travel as Beanstalk environment properties). Must define every key the backend requires at startup; extra keys are allowed. COGNITO_USER_POOL_ID is injected by the environment from the cognito module."
+  description = "Application environment variables passed to the Node.js process, secrets included (EMAIL_PASSWORD travels as a Beanstalk environment property). Must define every key the backend requires at startup; extra keys are allowed. COGNITO_USER_POOL_ID is injected by the environment from the cognito module."
   type        = map(string)
   sensitive   = true
   default     = {}
 
   validation {
     condition = alltrue([
-      for key in ["JWT_SECRET", "JWT_EXPIRATION", "ADMIN_USERNAME", "ADMIN_PASSWORD", "EMAIL", "EMAIL_PASSWORD", "AWS_REGION", "AWS_BUCKET_NAME", "ALLOWED_ORIGIN", "COGNITO_USER_POOL_ID"] : contains(keys(var.app_env_vars), key)
+      for key in ["EMAIL", "EMAIL_PASSWORD", "AWS_REGION", "AWS_BUCKET_NAME", "ALLOWED_ORIGIN", "COGNITO_USER_POOL_ID"] : contains(keys(var.app_env_vars), key)
     ])
-    error_message = "app_env_vars must define the keys the backend requires at startup: JWT_SECRET, JWT_EXPIRATION, ADMIN_USERNAME, ADMIN_PASSWORD, EMAIL, EMAIL_PASSWORD, AWS_REGION, AWS_BUCKET_NAME and ALLOWED_ORIGIN, plus COGNITO_USER_POOL_ID (injected by the environment from the cognito module)."
+    error_message = "app_env_vars must define the keys the backend requires at startup: EMAIL, EMAIL_PASSWORD, AWS_REGION, AWS_BUCKET_NAME and ALLOWED_ORIGIN, plus COGNITO_USER_POOL_ID (injected by the environment from the cognito module)."
   }
 }
