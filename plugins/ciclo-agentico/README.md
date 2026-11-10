@@ -24,6 +24,40 @@ Nota: puede que Claude Code exija el prefijo del plugin (`/ciclo-agentico:ciclo`
 
 Los cuatro roles (`agents/`) precargan la skill `principios`, que contiene los principios de trabajo y el contrato de salida común; cada rol solo añade qué es su resultado. Las reglas de git (no commit, no push, no `git add`, ni `stash`, `checkout`, `restore`, `reset` o `clean`) se repiten a propósito en la sección Límites de cada rol: son de seguridad y no deben depender de que la precarga de la skill funcione.
 
+## Modelos y esfuerzo por rol
+
+Cada rol fija su `model` y su `effort` en el frontmatter de `agents/`:
+
+| Rol | `model` | `effort` |
+|---|---|---|
+| `requirements` | sonnet | medium |
+| `architect` | opus | high |
+| `developer` | sonnet | medium |
+| `tester-documentador` | sonnet | medium |
+| Segunda opinión y revisión por escalado | opus (en la llamada) | high (en la llamada) |
+
+`/ciclo` no pasa `model` ni `effort` al lanzar los cuatro roles: manda el frontmatter. Solo la segunda opinión (cuando la pide el orquestador con `Agent`) y la revisión por escalado los fijan en la propia llamada; no se guardan en ningún archivo.
+
+**Precedencia.** `model`: parámetro de `Agent` > frontmatter > `CLAUDE_CODE_SUBAGENT_MODEL` > modelo de la sesión. `effort`: `CLAUDE_CODE_EFFORT_LEVEL` > parámetro de `Agent` > frontmatter > esfuerzo de la sesión.
+
+**Variables que anulan la tabla.** `CLAUDE_CODE_SUBAGENT_MODEL` y `CLAUDE_CODE_EFFORT_LEVEL`, si están definidas, anulan la tabla (según la precedencia de arriba). El paso 0 de `/ciclo` lo avisa con una línea («la tabla de modelos está anulada por <nombre de la variable>») sin imprimir ni pedir su valor, y no bloquea. Límite: si la variable solo está en el `env` de `settings.json`, puede que `Bash` no la vea y el aviso no salga **(por confirmar)**.
+
+**Fallo repetido.** El `developer` «falla lo mismo» cuando, en dos vueltas consecutivas, (a) el texto de la devolución del tester es el mismo (salvo espacios y saltos de línea sobrantes) o (b) el mismo comando de verificación falla con la misma línea clave. Entonces `/ciclo` no relanza al `developer` sin más: pide una revisión con opus y esfuerzo alto, pasándole el diff y el fallo. La revisión cuenta como una vuelta y respeta `maxVueltas`; solo informa (no corrige ni hace commit) y sus conclusiones van como devolución en la vuelta siguiente. Si el `developer` vuelve a fallar tras la revisión, se escala al usuario con el diff y el fallo. Con `maxVueltas` en 3, el fallo repetido solo se detecta al acabar la vuelta 2 y la revisión sube el contador al tope, así que el usuario decide siempre tras la revisión. Límite: un mismo fallo redactado de otra forma puede no detectarse; `maxVueltas` es la red de seguridad.
+
+**Qué medir.** Sin cambiar el flujo, leyendo la puerta final: vueltas por ciclo, devoluciones del tester y hallazgos de la segunda opinión. Aún no hay medición real.
+
+**Verificación manual (la hace el usuario, no los roles).**
+
+1. `claude plugin validate plugins/ciclo-agentico --strict`.
+2. `claude --debug` y buscar «does not recognize or apply» en la salida.
+3. Tras cambiar el plugin, `/reload-plugins` o una sesión nueva.
+
+Por confirmar: que `validate --strict` avise de un campo desconocido dentro de un agente (puede no avisar), y que `medium` y `high` sean válidos para sonnet y opus.
+
+**Riesgo.** Las copias del núcleo en otros repositorios (y sus cachés) siguen en 0.1.0 hasta que se copie el núcleo de nuevo; queda fuera de este cambio.
+
+**Atribución.** La idea y la tabla se inspiran en [ai-routing](https://github.com/donimas/ai-routing) (MIT); no se copian sus plantillas, su hook ni su `settings.json`.
+
 ## Dependencias
 
 El catálogo está en `.claude-plugin/dependencias.json`. Para comprobarlo o instalar lo que falte:

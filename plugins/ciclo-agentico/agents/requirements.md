@@ -2,6 +2,8 @@
 name: requirements
 description: Úsalo al inicio de cada ciclo para convertir una tarea en un borrador de spec con criterios de aceptación comprobables y la lista de preguntas abiertas para el usuario.
 tools: Read, Grep, Glob, Write
+model: sonnet
+effort: medium
 skills:
   - principios
 ---

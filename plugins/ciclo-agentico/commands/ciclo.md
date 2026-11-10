@@ -18,11 +18,17 @@ Corres en la conversación principal: lanzas los roles con `Agent` (`requirement
 - Nunca presentas la puerta final con verificación en rojo, excepto fallos preexistentes que el usuario haya aceptado explícitamente cuando se los escalaste; esos van a Riesgos. El cierre documental (`docs-gate` y demás entradas de documentación) no admite excepciones.
 - **Disponible**: las skills de ese plugin aparecen en esta sesión y el paso 0 no lo dio como faltante ni omitido.
 - **Estilo**: con `estilo: i-have-adhd`, añade a cada prompt de rol "Aplica tu contrato de salida" y, si la skill `i-have-adhd` está disponible (nombre de skill **por confirmar**), invócala para tus propios mensajes. Con `estilo: ninguno` no haces nada especial: el contrato ya llega a cada rol por la skill `principios`.
+- **Modelos**: las llamadas a `Agent` para `requirements`, `architect`, `developer` y `tester-documentador` no pasan `model` ni `effort`: manda el frontmatter de cada rol (tabla en el README del plugin). Solo la segunda opinión y la revisión por escalado fijan `model` opus y `effort` high en la propia llamada.
 - **Crítico**: el architect devolvió `crítico: sí` (su plan se compara con `criticidad`). Si devolvió `no determinable` (por ejemplo, falta `criticidad`), pregunta al usuario si se trata como crítico.
 - **Segunda opinión** (solo si es crítico, sobre el plan y sobre el diff):
   - Con `consultor: octopus` y Octopus disponible: `/octo:review` **(por confirmar el comando en un equipo donde funcione, y que `/octo:review` acepte un plan, que no es un diff)**.
   - Con `consultor: ninguno` o sin Octopus: la skill `superpowers:requesting-code-review`, adaptada. Para el plan, se revisa el archivo del plan. Para el diff, `git diff HEAD` más los archivos sin seguimiento (`git ls-files --others --exclude-standard`), que nombras en la petición; no `HEAD~1..HEAD`, que revisaría otro commit.
   - Solo informa: no se corrige nada (tampoco lo que marque como "Critical") y no se hace commit. El resultado se muestra en la puerta como segunda opinión y riesgo: nunca bloquea ni aprueba por sí solo.
+  - Modelo: cuando la pides tú con `Agent` (la skill `superpowers:requesting-code-review`), la llamada lleva `model` opus y `effort` high; no se fijan en un archivo. Con `/octo:review` el modelo lo decide Octopus **(por confirmar)**.
+- **Fallo repetido**: el `developer` "falla lo mismo" cuando, en dos vueltas consecutivas, se cumple una de estas condiciones: (a) el texto de la devolución del tester es el mismo (idéntico salvo espacios y saltos de línea sobrantes), o (b) el mismo comando de verificación falla con la misma línea clave. Se comprueba comparando ese texto, o el comando y la línea clave, que ya se muestran al escalar. Al detectarlo no relanzas al `developer` sin más: pides una revisión con `Agent`, con `model` opus y `effort` high en la llamada, pasándole el diff (`git diff HEAD` más los archivos sin seguimiento, que nombras) y el fallo.
+  - La revisión cuenta como una vuelta y respeta `maxVueltas`: suma 1 al contador y, si con ella se llega a `maxVueltas`, la pasada siguiente se trata como en el paso 4, punto 4 (escalar para conceder una vuelta más).
+  - Solo informa: no corrige nada ni hace commit. Sus conclusiones van como devolución al `developer` en la vuelta siguiente.
+  - Si el `developer` vuelve a fallar tras la revisión, escalas al usuario con el diff y el fallo.
 
 ## Paso 0: refresh y comprobaciones
 
@@ -39,6 +45,7 @@ Hasta el punto 5 el ciclo no escribe nada en el repositorio: la comprobación de
    - Si existe una de las dos, debe estar ignorada y sin archivos rastreados: `git check-ignore -q <carpeta>/` sale con 0 y `git ls-files .understand-anything .ua` no devuelve nada. Si no, avisa al usuario de que la añada al `.gitignore` y, si está rastreada, la quite del índice con `git rm -r --cached <carpeta>` (lo hace él), y sigue sin grafo.
    - Si no existe ninguna, deben estar ignoradas las dos: `git check-ignore -q .understand-anything/` y `git check-ignore -q .ua/` salen con 0. Si falta cualquiera, avisa de que hay que ignorar las dos y sigue sin grafo.
    - Si pasa la comprobación: desactualizado, invoca `understand-anything:understand` de forma explícita (nunca con `--auto-update`); inexistente, ofrécelo con `AskUserQuestion` y, antes del primer análisis, comprueba que `.understandignore` excluye entorno, secretos y dependencias.
+6. Variables que anulan la tabla de modelos (no bloquea): ejecuta con `Bash` `node -e "for (const n of ['CLAUDE_CODE_SUBAGENT_MODEL','CLAUDE_CODE_EFFORT_LEVEL']) if (n in process.env) console.log(n)"`, que imprime solo el nombre de las variables definidas, nunca su valor. Por cada nombre impreso, avisa en una línea: "la tabla de modelos está anulada por <nombre de la variable>". No imprimas ni pidas su valor y sigue.
 
 ## Paso 1: requisitos y puerta humana
 
@@ -70,7 +77,7 @@ Una vuelta es una pasada del paso 3 al 4; se cuentan desde 1 y el tope es `maxVu
 2. Lanza `tester-documentador` con las rutas de la spec y el plan, indicándole la sección "A cargo del tester-documentador" del plan (pasos de documentación que el developer no hace) y, si lo hay, el resultado de `understand-diff`.
 3. Foto de código, después, igual. Si difiere en algo (archivo nuevo, desaparecido u otro hash), la iteración falla porque el tester no puede tocar código de producción: escala con los archivos afectados. Opciones: volver al paso 3 con ese diff como devolución (cuenta como vuelta y respeta el tope del punto 4), que el usuario lo resuelva a mano y repetir el paso 4, o abandonar.
 4. Según la entrega del tester:
-   - **Devolución al developer**: si la vuelta es menor que `maxVueltas`, vuelve al paso 3 con el texto de la devolución. Si es igual, escala con el estado. Opciones: conceder una vuelta más, volver al paso 2 o abandonar.
+   - **Devolución al developer**: Antes de volver al paso 3, aplica la regla **Fallo repetido**. Si la vuelta es menor que `maxVueltas`, vuelve al paso 3 con el texto de la devolución. Si es igual, escala con el estado. Opciones: conceder una vuelta más, volver al paso 2 o abandonar.
    - **Preexistentes**: escálalos aparte con "Aceptar como riesgo" o "Abandonar"; no cuentan como vuelta. Los aceptados van a Riesgos de la puerta final.
    - **Bloqueo de configuración o documentación en rojo** tras sus reintentos: escala. Opciones: el usuario corrige y se repite el paso 4 (sin contar vuelta), volver al paso 2 si el código cambió algo no previsto en el plan, o abandonar.
    - **Verde** (o solo preexistentes aceptados): sigue.

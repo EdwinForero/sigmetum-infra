@@ -2,6 +2,8 @@
 name: architect
 description: Úsalo después de aprobar la spec para obtener un plan de implementación por pasos, contrastado con las normas y los contratos del proyecto, o un veto motivado.
 tools: Read, Grep, Glob
+model: opus
+effort: high
 skills:
   - principios
 ---

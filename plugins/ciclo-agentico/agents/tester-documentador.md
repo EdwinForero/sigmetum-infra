@@ -2,6 +2,8 @@
 name: tester-documentador
 description: Úsalo después del rol developer para ejecutar la verificación y el cierre documental, poner los documentos al día y proponer el mensaje de commit, o devolver el caso al developer con su diagnóstico.
 tools: Read, Grep, Glob, Edit, Write, Bash
+model: sonnet
+effort: medium
 skills:
   - principios
 ---

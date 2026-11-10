@@ -1,5 +1,16 @@
 # Cambios
 
+## 0.1.1
+
+Enrutado de modelos por rol. Contiene:
+
+- **Modelo y esfuerzo por rol**: cada agente fija `model` y `effort` en su frontmatter: `requirements`, `developer` y `tester-documentador` con sonnet y medium; `architect` con opus y high. Las llamadas a los roles desde `/ciclo` no pasan `model` ni `effort`.
+- **Segunda opinión y revisión por escalado**: se piden con `model` opus y `effort` high en la propia llamada, no en un archivo.
+- **Regla de fallo repetido** en `/ciclo`: si el `developer` falla lo mismo en dos vueltas consecutivas, se pide una revisión (que cuenta como vuelta y solo informa) antes de relanzarlo; si vuelve a fallar, se escala al usuario.
+- **Aviso del paso 0** de `/ciclo` cuando `CLAUDE_CODE_SUBAGENT_MODEL` o `CLAUDE_CODE_EFFORT_LEVEL` están definidas y anulan la tabla; solo imprime el nombre, nunca el valor.
+- **Pruebas nuevas** (`tests/modelos.test.mjs`) sobre los valores por rol, los nombres de campo y las reglas de `/ciclo`.
+- Idea y tabla inspiradas en https://github.com/donimas/ai-routing (MIT), sin copiar sus plantillas, su hook ni su configuración.
+
 ## 0.1.0
 
 Primera versión. Contiene:

@@ -44,7 +44,8 @@ Claude Code ejecuta los comandos, agentes y skills de un plugin instalado desde 
 
 1. Si el cambio altera el comportamiento, sube `version` en el `.claude-plugin/plugin.json` del plugin y, en el núcleo, añade la entrada en `ciclo-agentico/CHANGELOG.md` (y ajusta la versión que fija `ciclo-agentico/tests/manifiestos.test.mjs`).
 2. Actualiza o reinstala el plugin: `claude plugin marketplace update locales-infra` y después `claude plugin update <plugin>@locales-infra`, o `claude plugin uninstall <plugin>@locales-infra` y `claude plugin install <plugin>@locales-infra` **(por confirmar: que `update` recoja los cambios de un marketplace local sin subir la versión)**.
-3. Reinicia la sesión de Claude Code para que cargue la copia nueva.
+3. Reinicia la sesión de Claude Code (o ejecuta `/reload-plugins`) para que cargue la copia nueva.
+4. Comprueba el plugin con la [verificación manual](ciclo-agentico/README.md#modelos-y-esfuerzo-por-rol) (`claude plugin validate plugins/ciclo-agentico --strict` y `claude --debug`).
 
 Los scripts que se ejecutan como entradas de `verificacion` de `.claude/flujo.json` (por ejemplo, `node plugins/ciclo-agentico/scripts/docs-gate.mjs`) usan la copia del repositorio, así que ven el cambio sin reinstalar nada.
 

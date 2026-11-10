@@ -2,6 +2,8 @@
 name: developer
 description: Úsalo después de aprobar el plan para implementarlo con el cambio mínimo, con TDD cuando el proyecto tiene base de tests, o para corregir lo que devuelva el rol tester-documentador.
 tools: Read, Grep, Glob, Edit, Write, Bash
+model: sonnet
+effort: medium
 skills:
   - principios
 ---
