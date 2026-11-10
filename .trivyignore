@@ -1,0 +1,14 @@
+# Excepciones aceptadas de `trivy config` (trabajo informativo de .github/workflows/ci.yml).
+# Cada una tiene su hallazgo en docs/estado-y-deuda-tecnica.md; una entrada sin hallazgo no es aceptable.
+# Son globales (Trivy no filtra aquí por ruta): una distribución de CloudFront o un bucket nuevos
+# tampoco avisarán de estas dos reglas, así que se revisan a mano (docs/guias/seguridad.md).
+#
+# AWS-0104 (salida abierta del grupo de seguridad del origen de dev) NO se ignora a propósito: se resuelve
+# con S17 y debe seguir visible hasta entonces.
+
+# S19: CloudFront sin WAF (decisión de coste, no un fallo de configuración)
+AWS-0011
+
+# S20: cifrado SSE-S3 (AES256) en lugar de una clave KMS propia; aceptado. El bucket de logs de acceso
+# no admite SSE-KMS como destino de registros de S3.
+AWS-0132
