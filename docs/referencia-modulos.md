@@ -60,7 +60,7 @@ La condición `local.https_enabled` (`load_balancer_type = "application"` y `ssl
 
 ### Restricción del origen a CloudFront (solo `dev`)
 
-La condición `local.restrict_origin` (`enable_cdn` y `load_balancer_type = "single"`) crea, solo en `dev`, un grupo de seguridad propio de la instancia y lo pasa a Beanstalk con el setting `SecurityGroups` del espacio de nombres `aws:autoscaling:launchconfiguration`. Sin variables ni outputs nuevos. **(verificado en código; efecto en AWS por confirmar hasta el `apply`, S17)**
+La condición `local.restrict_origin` (`enable_cdn` y `load_balancer_type = "single"`) crea, solo en `dev`, un grupo de seguridad propio de la instancia y lo pasa a Beanstalk con el setting `SecurityGroups` del espacio de nombres `aws:autoscaling:launchconfiguration`. Sin variables ni outputs nuevos. **(verificado en código; efecto en AWS por confirmar hasta el `apply`, S17)** **Estado (10/11/2026): aplicado en `dev`, pero no cierra el acceso directo: Beanstalk conserva su propio grupo con el puerto 80 abierto (S17 abierto, a arreglar después).**
 
 | Recurso | Qué hace |
 |---|---|
@@ -126,8 +126,9 @@ Además, la app lleva `custom_headers` (caché y seguridad, en `dev` y `prod`) y
 | `backend_url` | string | — | URL base del backend inyectada como `VITE_BASE_URL` |
 | `s3_url` | string | `""` | URL base de CloudFront inyectada como `VITE_S3_URL`; usar `module.storage.cdn_url` (`dev` y `prod`) |
 | `carousel_image_keys` | string | `""` | Claves S3 separadas por comas inyectadas como `VITE_CAROUSEL_IMAGE_KEYS` |
-| `cognito_domain_url` | string | `""` | URL base del Hosted UI de Cognito: se inyecta como `VITE_COGNITO_DOMAIN` (solo rama) y se añade al `connect-src` de la CSP; vacío la omite |
+| `cognito_domain_url` | string | `""` | URL base del Hosted UI de Cognito: se inyecta como `VITE_COGNITO_DOMAIN` (solo rama) y se añade al `connect-src` de la CSP junto con el endpoint de la API de Cognito (`https://cognito-idp.<región>.amazonaws.com`); vacío omite los dos |
 | `cognito_client_id` | string | `""` | Id del cliente de Cognito, inyectado como `VITE_COGNITO_CLIENT_ID` (solo rama) |
+| `cognito_user_pool_id` | string | `""` | Id del pool de Cognito (el prefijo es la región), inyectado como `VITE_COGNITO_USER_POOL_ID` (solo rama) para el formulario de login del frontend; no es un secreto |
 | `custom_domains` | map(list(string)) | `{}` | Dominio raíz => prefijos de subdominio (`""` es el apex, `"www"` es `www.<raíz>`). Vacío no crea asociación ni registros. La clave debe ser un nombre en minúsculas, sin esquema, ruta ni puerto (`validation`) |
 
 ### Outputs
@@ -151,6 +152,7 @@ Variables de entorno que el módulo define en la app y en la rama. Se comparan c
 | `VITE_CAROUSEL_IMAGE_KEYS` | App y rama | `carousel_image_keys` |
 | `VITE_COGNITO_DOMAIN` | Solo rama | `cognito_domain_url` → `module.cognito.domain_url`. Solo en la rama por el ciclo de `dev` (`beanstalk` → `cognito` → `amplify` → `beanstalk`): la app depende del dominio de Cognito solo para la CSP; con una rama por app equivale, porque la variable de rama prevalece (**por confirmar**) |
 | `VITE_COGNITO_CLIENT_ID` | Solo rama | `cognito_client_id` → `module.cognito.client_id`. Mismo motivo |
+| `VITE_COGNITO_USER_POOL_ID` | Solo rama | `cognito_user_pool_id` → `module.cognito.user_pool_id` (la región es su prefijo). Solo en la rama, igual que el id del cliente. Lo usa el formulario de login propio del frontend (SRP); no es un secreto |
 
 Amplify ya no define `NODE_ENV` (M2). Vite fija `production` en `vite build` y Vitest fija `test`. Fijar `production` en toda la app haría que `npm ci` omitiera las `devDependencies` (se perderían `vite` y `vitest`) y que Vitest usara el React de producción, donde `act` no funciona. Con `NODE_ENV=dev`, React elegía su build de desarrollo aunque Vite imprimiera «building for production».
 
@@ -174,11 +176,11 @@ Registro CNAME `backend.<zona>` hacia Beanstalk. Solo lo usa `prod`; la zona de 
 
 ## Módulo cognito
 
-Pool de usuarios de Amazon Cognito, dominio del Hosted UI y cliente público para el login del administrador. Los atributos del proveedor `aws ~> 5.0` y la disponibilidad de Cognito en `eu-west-3` están **(por confirmar)**: `terraform validate` solo comprueba que los nombres existan. Contrato con el backend y el frontend en [para-backend.md](integracion/para-backend.md#login-con-cognito-contrato-del-backend) y [para-frontend.md](integracion/para-frontend.md#login-con-cognito-hosted-ui).
+Pool de usuarios de Amazon Cognito, dominio del Hosted UI y cliente público para el login del administrador. Los atributos del proveedor `aws ~> 5.0` y la disponibilidad de Cognito en `eu-west-3` están **(por confirmar)**: `terraform validate` solo comprueba que los nombres existan. Contrato con el backend y el frontend en [para-backend.md](integracion/para-backend.md#login-con-cognito-contrato-del-backend) y [para-frontend.md](integracion/para-frontend.md#login-con-cognito-formulario-propio).
 
 - **Pool** (`aws_cognito_user_pool.this`, nombre `<app_name>-<entorno>`): MFA `ON` con TOTP, `username_attributes = ["email"]` (**inmutable**: cambiarlo reemplaza el pool y borra usuarios y TOTP), registro cerrado (`allow_admin_create_user_only`), contraseña de 14 caracteres con las cuatro clases (temporal válida 3 días), recuperación `admin_only`, `deletion_protection` `ACTIVE` **solo en `prod`** (`dev` sin protección: aceptado), etiqueta `Component = "identity"`.
 - **Dominio** (`aws_cognito_user_pool_domain.this`): prefijo `domain_prefix` (único por región; si está ocupado el `apply` falla).
-- **Cliente** (`aws_cognito_user_pool_client.this`, nombre `<app_name>-<entorno>-web`, **por confirmar**): sin secreto, flujo OAuth `code`, ámbitos `openid` y `email`, solo proveedor `COGNITO`, `ALLOW_REFRESH_TOKEN_AUTH` como único flujo de autenticación explícito (sin SRP, decisión del usuario; si el `apply` lo rechaza, es una pregunta a la puerta), tokens de acceso e id de 60 minutos y refresco de 8 horas, revocación activa. **PKCE es un requisito del frontend**, no un control de este módulo.
+- **Cliente** (`aws_cognito_user_pool_client.this`, nombre `<app_name>-<entorno>-web`, **por confirmar**): sin secreto; autenticación explícita `ALLOW_USER_SRP_AUTH` (login con formulario propio del frontend, sin enviar la contraseña en claro; decisión del usuario del 10/11/2026) y `ALLOW_REFRESH_TOKEN_AUTH`; **ningún flujo de contraseña por API** (`ALLOW_USER_PASSWORD_AUTH` y `ALLOW_ADMIN_USER_PASSWORD_AUTH` están prohibidos por `quality-check`). Se mantienen el flujo OAuth `code`, los ámbitos `openid` y `email`, el proveedor `COGNITO` y las direcciones de retorno, para que el **Hosted UI siga funcionando como respaldo** (retirarlo es una decisión pendiente). Tokens de acceso e id de 60 minutos y refresco de 8 horas, revocación activa. **PKCE (Hosted UI) y SRP (formulario) son requisitos del frontend**, no controles de este módulo.
 - **Direcciones de retorno:** cada `allowed_origins` más `callback_path` y `logout_path`; el entorno pasa `module.amplify.site_origins`. Sin `localhost`.
 - **`C16`:** el backend no valida `client_id` ni grupos; cualquier usuario del pool es administrador (válido solo con el registro cerrado).
 
@@ -308,4 +310,4 @@ Claves que Terraform añade a `app_env_vars` en `main.tf` de cada entorno (`merg
 
 | Clave | Obligatoria en el backend | Notas |
 |---|---|---|
-| `COGNITO_USER_POOL_ID` | No | Id del pool de Cognito (`module.cognito.user_pool_id`); la región va en su prefijo. El backend la exigirá en `validateEnv.js` cuando valide tokens de Cognito (tarea del backend; entonces esta fila pasa a «Sí»). No es un secreto |
+| `COGNITO_USER_POOL_ID` | Sí | Id del pool de Cognito (`module.cognito.user_pool_id`); la región va en su prefijo. El backend la exige en `validateEnv.js` (forma `<región>_<id>` y región igual a `AWS_REGION`; si no, no arranca) **(verificado en `sigmetum-backend`, commit `578c59c`)**. No es un secreto |

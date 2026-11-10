@@ -67,6 +67,8 @@ module "amplify" {
   cognito_domain_url = module.cognito.domain_url
   cognito_client_id  = module.cognito.client_id
 
+  cognito_user_pool_id = module.cognito.user_pool_id
+
   # Apex and www serve the same app from master; both must be in ALLOWED_ORIGIN (deploy the backend first)
   custom_domains = {
     "sigmetum-a.org" = ["", "www"]

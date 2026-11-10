@@ -57,4 +57,6 @@ module "amplify" {
 
   cognito_domain_url = module.cognito.domain_url
   cognito_client_id  = module.cognito.client_id
+
+  cognito_user_pool_id = module.cognito.user_pool_id
 }

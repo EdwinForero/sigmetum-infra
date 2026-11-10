@@ -262,7 +262,7 @@ const outputs = tfFiles
   for (const client of resources.filter((r) => r.type === 'aws_cognito_user_pool_client' && r.dir === 'modules/cognito')) {
     const key = `${client.dir}:${client.label}`;
     if (!/^\s*generate_secret\s*=\s*false/m.test(client.body)) problems.push(`${key}: el cliente del user pool no tiene generate_secret = false (SEG-13, ver docs/guias/seguridad.md)`);
-    if (/ALLOW_(?:ADMIN_)?USER_PASSWORD_AUTH/.test(client.body)) problems.push(`${key}: el cliente permite login por contraseña por API (ALLOW_USER_PASSWORD_AUTH o ALLOW_ADMIN_USER_PASSWORD_AUTH); solo Hosted UI (SEG-13, ver docs/guias/seguridad.md)`);
+    if (/ALLOW_(?:ADMIN_)?USER_PASSWORD_AUTH/.test(client.body)) problems.push(`${key}: el cliente permite login por contraseña por API (ALLOW_USER_PASSWORD_AUTH o ALLOW_ADMIN_USER_PASSWORD_AUTH); solo SRP (ALLOW_USER_SRP_AUTH) o Hosted UI (SEG-13, ver docs/guias/seguridad.md)`);
   }
   for (const file of tfFiles.filter((f) => f.startsWith('modules/cognito/') || f.startsWith('environments/'))) {
     if (/localhost/i.test(tf[file])) problems.push(`${file}: contiene localhost; las callback_urls y logout_urls de Cognito no pueden apuntar a localhost (SEG-13, ver docs/guias/seguridad.md)`);

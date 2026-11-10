@@ -55,6 +55,12 @@ variable "cognito_client_id" {
   default     = ""
 }
 
+variable "cognito_user_pool_id" {
+  description = "ID of the Cognito user pool (its prefix is the region), injected as VITE_COGNITO_USER_POOL_ID (branch only) for the frontend's own login form. Not a secret."
+  type        = string
+  default     = ""
+}
+
 variable "custom_domains" {
   description = "Custom domains for the deployed branch: root domain name => subdomain prefixes (\"\" is the apex, \"www\" is www.<root>). Empty creates no domain association."
   type        = map(list(string))

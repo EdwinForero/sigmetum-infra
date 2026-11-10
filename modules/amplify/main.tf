@@ -11,7 +11,7 @@ locals {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src ${join(" ", compact(["'self'", var.s3_url, "https://*.s3.${data.aws_region.current.name}.amazonaws.com"]))}",
-    "connect-src ${join(" ", compact(["'self'", var.backend_url, var.cognito_domain_url]))}",
+    "connect-src ${join(" ", compact(["'self'", var.backend_url, var.cognito_domain_url, var.cognito_domain_url == "" ? "" : "https://cognito-idp.${data.aws_region.current.name}.amazonaws.com"]))}",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -110,12 +110,13 @@ resource "aws_amplify_branch" "this" {
   }
 
   environment_variables = {
-    VITE_BASE_URL            = var.backend_url
-    VITE_API_PREFIX          = "/api/v1"
-    VITE_S3_URL              = var.s3_url
-    VITE_CAROUSEL_IMAGE_KEYS = var.carousel_image_keys
-    VITE_COGNITO_DOMAIN      = var.cognito_domain_url
-    VITE_COGNITO_CLIENT_ID   = var.cognito_client_id
+    VITE_BASE_URL             = var.backend_url
+    VITE_API_PREFIX           = "/api/v1"
+    VITE_S3_URL               = var.s3_url
+    VITE_CAROUSEL_IMAGE_KEYS  = var.carousel_image_keys
+    VITE_COGNITO_DOMAIN       = var.cognito_domain_url
+    VITE_COGNITO_CLIENT_ID    = var.cognito_client_id
+    VITE_COGNITO_USER_POOL_ID = var.cognito_user_pool_id
   }
 }
 

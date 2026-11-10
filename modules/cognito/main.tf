@@ -55,8 +55,11 @@ resource "aws_cognito_user_pool_client" "this" {
   name         = "${var.app_name}-${var.environment}-web"
   user_pool_id = aws_cognito_user_pool.this.id
 
-  generate_secret     = false
-  explicit_auth_flows = ["ALLOW_REFRESH_TOKEN_AUTH"]
+  generate_secret = false
+
+  # SRP lets the frontend run its own login form without sending the password in clear text.
+  # Plain password flows (ALLOW_USER_PASSWORD_AUTH, ALLOW_ADMIN_USER_PASSWORD_AUTH) stay out (SEG-13).
+  explicit_auth_flows = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
 
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_flows_user_pool_client = true

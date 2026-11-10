@@ -71,6 +71,7 @@
     ],
     "modules/cognito/**": [
       "docs/referencia-modulos.md",
+      "docs/cognito-administradores.md",
       "docs/integracion/para-backend.md",
       "docs/integracion/para-frontend.md",
       "docs/guias/seguridad.md"
